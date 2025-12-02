@@ -15,9 +15,9 @@ from einops import repeat
 from diff_gaussian_rasterization import GaussianRasterizer
 from diff_gaussian_rasterization import GaussianRasterizationSettings
 
-from scene.gaussian_model import GaussianModel
-from utils.ref_utils import reflect
-from utils.general_utils import get_minimum_axis, flip_align_view
+from gaussian_splatting.scene.gaussian_model import GaussianModel
+from gaussian_splatting.utils.ref_utils import reflect
+from gaussian_splatting.utils.general_utils import get_minimum_axis, flip_align_view
 
 def generate_neural_gaussians(viewpoint_camera, pc : GaussianModel,
                               visible_mask=None, is_training=False,
