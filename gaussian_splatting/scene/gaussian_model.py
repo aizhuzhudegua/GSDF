@@ -883,15 +883,31 @@ class GaussianModel:
                 
 
 
-    def adjust_anchor(self, check_interval=100, success_threshold=0.8, grad_threshold=0.0002, min_opacity=0.005):
+    def adjust_anchor(self, extent, add_contents=None, check_interval=100, success_threshold=0.8, grad_threshold=0.0002, min_opacity=0.005, xyz_sdf=None, anchor_sdf=None, inside_box=None, anchor_inside_box=None, growing_weight=0.0002):
+        
+        if xyz_sdf!=None:
+            # Activate function (Gaussian) for sdf. 
+            def simple_sdf_activate(x, sigma=0.01):
+                return torch.exp(-x**2/sigma)
         # # adding anchors
         grads = self.offset_gradient_accum / self.offset_denom # [N*k, 1]
         grads[grads.isnan()] = 0.0
+
         grads_norm = torch.norm(grads, dim=-1)
+        
+        if xyz_sdf is not None:
+            xyz_sdf_activated = simple_sdf_activate(xyz_sdf)
+            xyz_sdf_activated[~inside_box] = 0.0
+            grow_alpha = growing_weight # 0.0002
+            print("grow_alpha:", grow_alpha)
+            weight_prune = 1
+            # update the grads_norm according to the sdf value
+            grads_norm  = grads_norm + grow_alpha * xyz_sdf_activated
+           
         offset_mask = (self.offset_denom > check_interval*success_threshold*0.5).squeeze(dim=1)
         
         self.anchor_growing(grads_norm, grad_threshold, offset_mask)
-        
+
         # update offset_denom
         self.offset_denom[offset_mask] = 0
         padding_offset_demon = torch.zeros([self.get_anchor.shape[0]*self.n_offsets - self.offset_denom.shape[0], 1],
@@ -905,10 +921,27 @@ class GaussianModel:
                                            device=self.offset_gradient_accum.device)
         self.offset_gradient_accum = torch.cat([self.offset_gradient_accum, padding_offset_gradient_accum], dim=0)
         
-        # # prune anchors
-        prune_mask = (self.opacity_accum < min_opacity*self.anchor_demon).squeeze(dim=1)
+        
+        anchor_opacity_sdf_accum = self.opacity_accum 
+
+        if anchor_sdf is not None:
+            
+            anchor_sdf_activated = simple_sdf_activate(anchor_sdf)
+            anchor_sdf_activated[~anchor_inside_box] = 1
+            padding_length = self.get_anchor.shape[0] - anchor_sdf_activated.shape[0]
+            padding_ones = torch.ones([padding_length]).to(self.get_anchor.device)
+            padded_anchor_sdf_activated = torch.cat([anchor_sdf_activated, padding_ones], dim=0)
+            #update the opacity_accum with the anchor sdf value.
+            anchor_opacity_sdf_accum = self.opacity_accum - weight_prune*self.anchor_demon *(1- padded_anchor_sdf_activated.unsqueeze(dim=1)) 
+
+        prune_mask = (anchor_opacity_sdf_accum < min_opacity*self.anchor_demon).squeeze(dim=1)
         anchors_mask = (self.anchor_demon > check_interval*success_threshold).squeeze(dim=1) # [N, 1]
         prune_mask = torch.logical_and(prune_mask, anchors_mask) # [N] 
+
+        scaling_mask= self.get_scaling.max(dim=1).values > 0.1 * extent
+        prune_mask = torch.logical_and(prune_mask, scaling_mask) # [N]
+
+
         
         # update offset_denom
         offset_denom = self.offset_denom.view([-1, self.n_offsets])[~prune_mask]
