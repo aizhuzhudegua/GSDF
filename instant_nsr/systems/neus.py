@@ -77,15 +77,15 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
                     
                     render_pkg = renderFunc(viewpoint, scene.gaussians, *renderArgs, visible_mask=voxel_visible_mask,out_depth=True,return_normal=True)
                     image = torch.clamp(render_pkg["render"], 0.0, 1.0)
-                    depth_gs = render_pkg["depth_hand"]
+                    depth_gs = render_pkg["depth"]
                     depth_gs=depth_gs/depth_gs.max()
-                    normal_gs = render_pkg["gs_normal"]
-                    normal_gs_normal=(F.normalize(normal_gs, p=2, dim=0)+1)/2
+                    normal_gs = render_pkg["normal"]
+                    normal_normal=(F.normalize(normal_gs, p=2, dim=0)+1)/2
 
                     gt_image = torch.clamp(viewpoint.original_image.to("cuda"), 0.0, 1.0)
                     if tb_writer and (idx < 38):
                         tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/render".format(viewpoint.image_name), image[None], global_step=iteration)
-                        tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/normal".format(viewpoint.image_name), normal_gs_normal[None], global_step=iteration)
+                        tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/normal".format(viewpoint.image_name), normal_normal[None], global_step=iteration)
                         tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/depth".format(viewpoint.image_name), depth_gs[None], global_step=iteration)
 
                         tb_writer.add_images(f'{dataset_name}/'+config['name'] + "_view_{}/errormap".format(viewpoint.image_name), (gt_image[None]-image[None]).abs(), global_step=iteration)
@@ -425,11 +425,11 @@ class NeuSSystem(BaseSystem):
             render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, random_background, visible_mask=voxel_visible_mask, retain_grad=retain_grad, out_depth=True, return_normal=True, radius=self.config.model.radius)
 
             # render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, self.background, visible_mask=voxel_visible_mask, retain_grad=retain_grad, out_depth=True, return_normal=True, radius=self.config.model.radius)
-            image, viewspace_point_tensor, visibility_filter, offset_selection_mask, radii, scaling, opacity_gs, gs_depth_hand,gs_normal = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["selection_mask"], render_pkg["radii"], render_pkg["scaling"], render_pkg["neural_opacity"], render_pkg["depth_hand"], render_pkg["gs_normal"]
-            gs_depth = gs_depth_hand.mean(dim=0,keepdim=True).permute(1, 2, 0)
+            image, viewspace_point_tensor, visibility_filter, offset_selection_mask, radii, scaling, opacity_gs, gs_depth,normal = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["selection_mask"], render_pkg["radii"], render_pkg["scaling"], render_pkg["neural_opacity"], render_pkg["depth"], render_pkg["normal"]
+            gs_depth = gs_depth.mean(dim=0,keepdim=True).permute(1, 2, 0)
             picked_gs_depth = gs_depth[yy,xx]
-            gs_normal = gs_normal.permute(1, 2, 0)
-            picked_gs_normal = gs_normal[yy,xx]
+            normal = normal.permute(1, 2, 0)
+            picked_normal = normal[yy,xx]
             time2=time.time()
             time_1=time2-time1
             
@@ -453,7 +453,7 @@ class NeuSSystem(BaseSystem):
         loss = 0.
 
         # predicted normal and depth of Scaffold-GS, taken as GT of the Instant-NSR side
-        fixed_picked_gs_normal = picked_gs_normal[out['rays_valid'][...,0]].detach()
+        fixed_picked_normal = picked_normal[out['rays_valid'][...,0]].detach()
         fixed_picked_gs_depth = picked_gs_depth[out['rays_valid'][...,0]].detach()
         # The depth loss for the Instant-nsr.
         diff_neus = torch.abs(out['depth'][out['rays_valid'][...,0]] - fixed_picked_gs_depth)
@@ -472,10 +472,10 @@ class NeuSSystem(BaseSystem):
 
         # The normal loss for the Instant-nsr is only taken into account after the warmup period.
         if self.current_epoch_set > self.config.model.geometry.xyz_encoding_config.start_step:
-            normal_diff = self.cos_similarity_loss(fixed_picked_gs_normal,out['comp_normal'][out['rays_valid'][...,0]])
+            normal_diff = self.cos_similarity_loss(fixed_picked_normal,out['comp_normal'][out['rays_valid'][...,0]])
             loss +=  normal_diff * self.config.system.loss.normal_w
         else:
-            normal_diff = self.cos_similarity_loss(fixed_picked_gs_normal,out['comp_normal'][out['rays_valid'][...,0]])
+            normal_diff = self.cos_similarity_loss(fixed_picked_normal,out['comp_normal'][out['rays_valid'][...,0]])
             loss +=  normal_diff * 0.0
         self.log('train/normal_loss_neus', normal_diff)
 
@@ -545,9 +545,9 @@ class NeuSSystem(BaseSystem):
                 if self.current_epoch_set < self.config.model.geometry.xyz_encoding_config.start_step:                
                     normal_loss_gs = 0.0
                 else:
-                    normal_loss_gs = self.cos_similarity_loss(picked_gs_normal[out['rays_valid'][...,0]],fixed_neus_picked_normal)* self.config.system.loss.normal_w
+                    normal_loss_gs = self.cos_similarity_loss(picked_normal[out['rays_valid'][...,0]],fixed_neus_picked_normal)* self.config.system.loss.normal_w
 
-                self.log('train/GS_normal_loss_gs', normal_loss_gs)
+                self.log('train/normal_loss_gs', normal_loss_gs)
                 # depth loss of GS side
                 diff = torch.abs(fixed_neus_picked_depth - picked_gs_depth[out['rays_valid'][...,0]])
                 
