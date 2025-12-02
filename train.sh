@@ -1,5 +1,5 @@
 exp_dir=./exp
-config=configs/tnt/barn.yaml
+config=configs/db/db_playroom.yaml
 gpu=0
 tag=release
 
