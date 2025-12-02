@@ -90,7 +90,7 @@ class GaussianModel:
                  update_init_factor: int=100,
                  update_hierachy_factor: int=4,
                  use_feat_bank : bool = False,
-                 appearance_dim : int = 0,
+                 appearance_dim : int = 32,
                  ratio : int = 1,
                  add_opacity_dist : bool = False,
                  add_cov_dist : bool = False,
@@ -110,7 +110,7 @@ class GaussianModel:
         self.update_hierachy_factor = update_hierachy_factor
         self.use_feat_bank = use_feat_bank
 
-        self.appearance_dim = appearance_dim
+        self.appearance_dim = 0
         self.embedding_appearance = None
         self.ratio = ratio
         self.add_opacity_dist = add_opacity_dist
