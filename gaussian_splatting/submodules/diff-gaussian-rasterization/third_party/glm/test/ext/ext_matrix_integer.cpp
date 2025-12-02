@@ -12,7 +12,7 @@
 
 using namespace glm;
 
-static int test_matrixCompMult()
+int test_matrixCompMult()
 {
 	int Error = 0;
 
@@ -82,7 +82,7 @@ static int test_matrixCompMult()
 	return Error;
 }
 
-static int test_outerProduct()
+int test_outerProduct()
 {
 	int Error = 0;
 
@@ -129,7 +129,7 @@ static int test_outerProduct()
 	return Error;
 }
 
-static int test_transpose()
+int test_transpose()
 {
 	int Error = 0;
 
@@ -199,7 +199,7 @@ static int test_transpose()
 	return Error;
 }
 
-static int test_determinant()
+int test_determinant()
 {
 	int Error = 0;
 

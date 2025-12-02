@@ -2,7 +2,7 @@
 #include <glm/ext/scalar_relational.hpp>
 #include <limits>
 
-static int test_ulp_float_dist()
+int test_ulp_float_dist()
 {
 	int Error = 0;
 
@@ -21,7 +21,7 @@ static int test_ulp_float_dist()
 	return Error;
 }
 
-static int test_ulp_float_step()
+int test_ulp_float_step()
 {
 	int Error = 0;
 
@@ -43,7 +43,7 @@ static int test_ulp_float_step()
 	return Error;
 }
 
-static int test_ulp_double_dist()
+int test_ulp_double_dist()
 {
 	int Error = 0;
 
@@ -62,7 +62,7 @@ static int test_ulp_double_dist()
 	return Error;
 }
 
-static int test_ulp_double_step()
+int test_ulp_double_step()
 {
 	int Error = 0;
 

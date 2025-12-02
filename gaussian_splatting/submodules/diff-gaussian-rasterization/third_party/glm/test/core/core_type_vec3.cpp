@@ -9,21 +9,11 @@
 #include <glm/vec4.hpp>
 #include <vector>
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wglobal-constructors"
-#	pragma clang diagnostic ignored "-Wunused-variable"
-#endif
-
 static glm::vec3 g1;
 static glm::vec3 g2(1);
 static glm::vec3 g3(1, 1, 1);
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
-static int test_vec3_ctor()
+int test_vec3_ctor()
 {
 	int Error = 0;
 
@@ -42,7 +32,7 @@ static int test_vec3_ctor()
 	{
 		glm::vec3 a{ 0, 1, 2 };
 		std::vector<glm::vec3> v = {
-			a,
+			{0, 1, 2},
 			{4, 5, 6},
 			{8, 9, 0}};
 	}
@@ -50,7 +40,7 @@ static int test_vec3_ctor()
 	{
 		glm::dvec3 a{ 0, 1, 2 };
 		std::vector<glm::dvec3> v = {
-			a,
+			{0, 1, 2},
 			{4, 5, 6},
 			{8, 9, 0}};
 	}
@@ -70,9 +60,8 @@ static int test_vec3_ctor()
 		Tests.push_back(glm::ivec3(1, 2, 3));
 		Tests.push_back(glm::ivec3(glm::ivec4(1, 2, 3, 4)));
 
-		for (std::size_t i = 0; i < Tests.size(); ++i) {
+		for(std::size_t i = 0; i < Tests.size(); ++i)
 			Error += Tests[i] == glm::ivec3(1, 2, 3) ? 0 : 1;
-		}
 	}
 
 	{
@@ -136,23 +125,30 @@ static int test_vec3_ctor()
 	return Error;
 }
 
+float foo()
+{
+	glm::vec3 bar = glm::vec3(0.0f, 1.0f, 1.0f);
+
+	return glm::length(bar);
+}
+
 static int test_bvec3_ctor()
 {
 	int Error = 0;
 
-	glm::bvec3 A(true);
-	glm::bvec3 B(true);
-	glm::bvec3 C(false);
-	glm::bvec3 D = A && B;
-	glm::bvec3 E = A && C;
-	glm::bvec3 F = A || C;
+	glm::bvec3 const A(true);
+	glm::bvec3 const B(true);
+	glm::bvec3 const C(false);
+	glm::bvec3 const D = A && B;
+	glm::bvec3 const E = A && C;
+	glm::bvec3 const F = A || C;
 
 	Error += D == glm::bvec3(true) ? 0 : 1;
 	Error += E == glm::bvec3(false) ? 0 : 1;
 	Error += F == glm::bvec3(true) ? 0 : 1;
 
-	bool G = A == C;
-	bool H = A != C;
+	bool const G = A == C;
+	bool const H = A != C;
 	Error += !G ? 0 : 1;
 	Error += H ? 0 : 1;
 
@@ -253,18 +249,6 @@ static int test_vec3_operators()
 		B /= 2;
 		Error += B == glm::ivec3(2, 1, 1) ? 0 : 1;
 	}
-
-	{
-		glm::ivec3 A(1.0f, 2.0f, 3.0f);
-		glm::ivec3 B(4.0f, 4.0f, 6.0f);
-
-		B = B / A;
-		Error += B == glm::ivec3(4, 2, 2) ? 0 : 1;
-
-		B = B / 2;
-		Error += B == glm::ivec3(2, 1, 1) ? 0 : 1;
-	}
-
 	{
 		glm::ivec3 B(2);
 
@@ -307,7 +291,7 @@ static int test_vec3_operators()
 	return Error;
 }
 
-static int test_vec3_size()
+int test_vec3_size()
 {
 	int Error = 0;
 	
@@ -324,13 +308,13 @@ static int test_vec3_size()
 	Error += glm::vec3::length() == 3 ? 0 : 1;
 	Error += glm::dvec3::length() == 3 ? 0 : 1;
 
-	GLM_CONSTEXPR glm::length_t Length = glm::vec3::length();
+	GLM_CONSTEXPR std::size_t Length = glm::vec3::length();
 	Error += Length == 3 ? 0 : 1;
 
 	return Error;
 }
 
-static int test_vec3_swizzle3_2()
+int test_vec3_swizzle3_2()
 {
 	int Error = 0;
 
@@ -394,7 +378,7 @@ static int test_vec3_swizzle3_2()
 	return Error;
 }
 
-static int test_vec3_swizzle3_3()
+int test_vec3_swizzle3_3()
 {
 	int Error = 0;
 
@@ -422,15 +406,15 @@ static int test_vec3_swizzle3_3()
 	return Error;
 }
 
-static int test_vec3_swizzle_operators()
+int test_vec3_swizzle_operators()
 {
 	int Error = 0;
 
+	glm::ivec3 const u = glm::ivec3(1, 2, 3);
+	glm::ivec3 const v = glm::ivec3(10, 20, 30);
+
 #	if GLM_CONFIG_SWIZZLE == GLM_SWIZZLE_OPERATOR
 	{
-		glm::ivec3 const u = glm::ivec3(1, 2, 3);
-		glm::ivec3 const v = glm::ivec3(10, 20, 30);
-
 		glm::ivec3 q;
 
 		// Swizzle, swizzle binary operators
@@ -464,7 +448,7 @@ static int test_vec3_swizzle_operators()
 	return Error;
 }
 
-static int test_vec3_swizzle_functions()
+int test_vec3_swizzle_functions()
 {
 	int Error = 0;
 
@@ -507,7 +491,7 @@ static int test_vec3_swizzle_functions()
 	return Error;
 }
 
-static int test_vec3_swizzle_partial()
+int test_vec3_swizzle_partial()
 {
 	int Error = 0;
 
@@ -624,11 +608,6 @@ static int test_constexpr()
 
 int main()
 {
-	// Suppress unused variable warnings
-	(void)g1;
-	(void)g2;
-	(void)g3;
-
 	int Error = 0;
 
 	Error += test_vec3_ctor();

@@ -4,7 +4,7 @@
 #include <glm/gtx/integer.hpp>
 #include <cstdio>
 /*
-static int test_floor_log2()
+int test_floor_log2()
 {
 	int Error = 0;
 
@@ -20,7 +20,7 @@ static int test_floor_log2()
 	return Error;
 }
 */
-static int test_log2()
+int test_log2()
 {
 	int Error = 0;
 
@@ -41,18 +41,18 @@ static int test_log2()
 	return Error;
 }
 
-static int test_nlz()
+int test_nlz()
 {
 	int Error = 0;
 
 	for(glm::uint i = 1; i < glm::uint(33); ++i)
-		Error += glm::nlz(i) == 31u - static_cast<glm::uint>(glm::findMSB(i)) ? 0 : 1;
+		Error += glm::nlz(i) == glm::uint(31u) - glm::findMSB(i) ? 0 : 1;
 		//printf("%d, %d\n", glm::nlz(i), 31u - glm::findMSB(i));
 
 	return Error;
 }
 
-static int test_pow_uint()
+int test_pow_uint()
 {
 	int Error = 0;
 
@@ -68,7 +68,7 @@ static int test_pow_uint()
 	return Error;
 }
 
-static int test_pow_int()
+int test_pow_int()
 {
 	int Error = 0;
 

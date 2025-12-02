@@ -5,20 +5,10 @@
 #include <glm/vec2.hpp>
 #include <vector>
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wglobal-constructors"
-#	pragma clang diagnostic ignored "-Wunused-variable"
-#endif
-
 static glm::vec1 g1;
 static glm::vec1 g2(1);
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
-static int test_operators()
+int test_vec1_operators()
 {
 	int Error = 0;
 
@@ -46,7 +36,7 @@ static int test_operators()
 	return Error;
 }
 
-static int test_ctor()
+int test_vec1_ctor()
 {
 	int Error = 0;
 
@@ -82,28 +72,18 @@ static int test_ctor()
 */
 
 	{
-		glm::vec1 A = glm::vec2(2.0f);
-		Error += glm::all(glm::equal(A, glm::vec1(2.0f), glm::epsilon<float>())) ? 0 : 1;
-
-		glm::vec1 B = glm::vec2(2.0f, 3.0f);
-		Error += glm::all(glm::equal(B, glm::vec1(2.0f), glm::epsilon<float>())) ? 0 : 1;
-
-		glm::vec1 C = glm::vec2(2.0f, 3.0);
-		Error += glm::all(glm::equal(C, glm::vec1(2.0f), glm::epsilon<float>())) ? 0 : 1;
-
-		//glm::vec1 D = glm::dvec1(2.0); // Build error TODO: What does the specification says?
-
-		glm::vec1 E(glm::dvec2(2.0));
-		Error += glm::all(glm::equal(E, glm::vec1(2.0f), glm::epsilon<float>())) ? 0 : 1;
-
-		glm::vec1 F(glm::ivec2(2));
-		Error += glm::all(glm::equal(F, glm::vec1(2.0f), glm::epsilon<float>())) ? 0 : 1;
+		glm::vec2 A = glm::vec2(2.0f);
+		glm::vec2 B = glm::vec2(2.0f, 3.0f);
+		glm::vec2 C = glm::vec2(2.0f, 3.0);
+		//glm::vec2 D = glm::dvec2(2.0); // Build error TODO: What does the specification says?
+		glm::vec2 E(glm::dvec2(2.0));
+		glm::vec2 F(glm::ivec2(2));
 	}
 
 	return Error;
 }
 
-static int test_size()
+static int test_vec1_size()
 {
 	int Error = 0;
 
@@ -119,7 +99,7 @@ static int test_size()
 	return Error;
 }
 
-static int test_operator_increment()
+static int test_vec1_operator_increment()
 {
 	int Error(0);
 
@@ -176,16 +156,12 @@ static int test_constexpr()
 
 int main()
 {
-	// Suppress unused variable warnings
-	(void)g1;
-	(void)g2;
-
 	int Error = 0;
 
-	Error += test_size();
-	Error += test_ctor();
-	Error += test_operators();
-	Error += test_operator_increment();
+	Error += test_vec1_size();
+	Error += test_vec1_ctor();
+	Error += test_vec1_operators();
+	Error += test_vec1_operator_increment();
 	Error += test_swizzle();
 	Error += test_constexpr();
 	

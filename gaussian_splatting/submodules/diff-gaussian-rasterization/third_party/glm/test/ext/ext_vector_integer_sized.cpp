@@ -65,12 +65,13 @@ static int test_operators()
 	}
 
 	{
-		genType B(1);
-		genType C(2);
+		genType const A(0);
+		genType const B(1);
+		genType const C(2);
 
-		genType D = B << B;
+		genType const D = B << B;
 		Error += D == genType(2) ? 0 : 1;
-		genType E = C >> B;
+		genType const E = C >> B;
 		Error += E == genType(1) ? 0 : 1;
 	}
 

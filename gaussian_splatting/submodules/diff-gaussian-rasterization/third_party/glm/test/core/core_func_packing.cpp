@@ -4,7 +4,7 @@
 #include <glm/packing.hpp>
 #include <vector>
 
-static int test_packUnorm2x16()
+int test_packUnorm2x16()
 {
 	int Error = 0;
 
@@ -25,7 +25,7 @@ static int test_packUnorm2x16()
 	return Error;
 }
 
-static int test_packSnorm2x16()
+int test_packSnorm2x16()
 {
 	int Error = 0;
 
@@ -46,7 +46,7 @@ static int test_packSnorm2x16()
 	return Error;
 }
 
-static int test_packUnorm4x8()
+int test_packUnorm4x8()
 {
 	int Error = 0;
 
@@ -72,7 +72,7 @@ static int test_packUnorm4x8()
 	return Error;
 }
 
-static int test_packSnorm4x8()
+int test_packSnorm4x8()
 {
 	int Error = 0;
 	
@@ -92,7 +92,7 @@ static int test_packSnorm4x8()
 	return Error;
 }
 
-static int test_packHalf2x16()
+int test_packHalf2x16()
 {
 	int Error = 0;
 /*
@@ -119,7 +119,7 @@ static int test_packHalf2x16()
 	return Error;
 }
 
-static int test_packDouble2x32()
+int test_packDouble2x32()
 {
 	int Error = 0;
 	

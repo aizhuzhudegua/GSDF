@@ -28,8 +28,8 @@ static int test_ctr()
 		glm::quat A{0, 1, 2, 3};
 
 		std::vector<glm::quat> B{
-			A,
-			{0, 1, 2, 3}};
+			{0, 1, 2, 3},
+		{0, 1, 2, 3}};
 	}
 #	endif//GLM_HAS_INITIALIZER_LISTS
 

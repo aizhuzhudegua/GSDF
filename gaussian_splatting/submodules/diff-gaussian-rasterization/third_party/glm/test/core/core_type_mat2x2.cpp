@@ -15,42 +15,26 @@
 #include <glm/mat4x4.hpp>
 #include <vector>
 
-static int test_operators()
+int test_operators()
 {
-	int Error = 0;
-
 	glm::mat2x2 l(1.0f);
 	glm::mat2x2 m(1.0f);
 	glm::vec2 u(1.0f);
 	glm::vec2 v(1.0f);
 	float x = 1.0f;
-
 	glm::vec2 a = m * u;
-	Error += glm::all(glm::equal(a, glm::vec2(1.0f), glm::epsilon<float>())) ? 0 : 1;
-
 	glm::vec2 b = v * m;
-	Error += glm::all(glm::equal(b, glm::vec2(1.0f), glm::epsilon<float>())) ? 0 : 1;
-
-	glm::mat2x2 n0(1.0f, 1.0f, 1.0f, 1.0f);
-	glm::mat2x2 n = x / n0;
-	Error += glm::all(glm::equal(n, n0, glm::epsilon<float>())) ? 0 : 1;
-
+	glm::mat2x2 n = x / m;
 	glm::mat2x2 o = m / x;
-	Error += glm::all(glm::equal(o, m, glm::epsilon<float>())) ? 0 : 1;
-
 	glm::mat2x2 p = x * m;
-	Error += glm::all(glm::equal(p, m, glm::epsilon<float>())) ? 0 : 1;
-
 	glm::mat2x2 q = m * x;
 	bool R = glm::any(glm::notEqual(m, q, glm::epsilon<float>()));
 	bool S = glm::all(glm::equal(m, l, glm::epsilon<float>()));
 
-	Error += (S && !R) ? 0 : 1;
-
-	return Error;
+	return (S && !R) ? 0 : 1;
 }
 
-static int test_inverse()
+int test_inverse()
 {
 	int Error(0);
 
@@ -74,7 +58,7 @@ static int test_inverse()
 	return Error;
 }
 
-static int test_ctr()
+int test_ctr()
 {
 	int Error = 0;
 	
@@ -124,7 +108,7 @@ static int test_ctr()
 namespace cast
 {
 	template<typename genType>
-	static int entry()
+	int entry()
 	{
 		int Error = 0;
 
@@ -137,7 +121,7 @@ namespace cast
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 		
@@ -155,7 +139,7 @@ namespace cast
 	}
 }//namespace cast
 
-static int test_size()
+int test_size()
 {
 	int Error = 0;
 
@@ -169,18 +153,13 @@ static int test_size()
 	return Error;
 }
 
-static int test_constexpr()
+int test_constexpr()
 {
-	int Error = 0;
-
 #if GLM_HAS_CONSTEXPR
 	static_assert(glm::mat2x2::length() == 2, "GLM: Failed constexpr");
-
-	constexpr glm::mat2x2 const Z(1.0f);
-	Error += glm::all(glm::equal(Z, glm::mat2x2(1.0f), glm::epsilon<float>())) ? 0 : 1;
 #endif
 
-	return Error;
+	return 0;
 }
 
 int main()

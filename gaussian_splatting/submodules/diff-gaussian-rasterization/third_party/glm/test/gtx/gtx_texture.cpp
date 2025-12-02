@@ -1,9 +1,8 @@
-#include <glm/vec2.hpp>
-
 #define GLM_ENABLE_EXPERIMENTAL
+#include <glm/vec2.hpp>
 #include <glm/gtx/texture.hpp>
 
-static int test_levels()
+int test_levels()
 {
 	int Error = 0;
 

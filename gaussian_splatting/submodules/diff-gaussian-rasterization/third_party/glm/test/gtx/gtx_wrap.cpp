@@ -5,7 +5,7 @@
 
 namespace clamp
 {
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -42,7 +42,7 @@ namespace clamp
 
 namespace repeat
 {
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -82,7 +82,7 @@ namespace repeat
 
 namespace mirrorClamp
 {
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -131,7 +131,7 @@ namespace mirrorClamp
 
 namespace mirrorRepeat
 {
-	static int test()
+	int test()
 	{
 		int Error(0);
 

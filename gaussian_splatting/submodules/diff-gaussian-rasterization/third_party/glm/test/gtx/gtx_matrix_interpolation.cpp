@@ -39,7 +39,7 @@ static int test_axisAngle()
 }
 
 template <class T>
-static int testForAxisAngle(glm::vec<3, T, glm::defaultp> const axisTrue, T const angleTrue)
+int testForAxisAngle(glm::vec<3, T, glm::defaultp> const axisTrue, T const angleTrue)
 {
     T const eps = std::sqrt(std::numeric_limits<T>::epsilon());
 

@@ -16,7 +16,7 @@
 
 namespace log2_
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -53,14 +53,9 @@ namespace log2_
 		return Error;
 	}
 
-	static int perf(std::size_t Count)
+	int perf(std::size_t Count)
 	{
 		int Error = 0;
-
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wsign-conversion"
-#endif
 
 		{
 			std::vector<int> Result;
@@ -90,21 +85,12 @@ namespace log2_
 			std::printf("glm::log2<ivec4>: %d clocks\n", static_cast<int>(End - Begin));
 		}
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
 #		if GLM_HAS_BITSCAN_WINDOWS
 		{
 			std::vector<glm::ivec4> Result;
 			Result.resize(Count);
 
 			std::clock_t Begin = clock();
-
-#if GLM_COMPILER& GLM_COMPILER_VC
-#	pragma warning(push)
-#	pragma warning(disable: 4267)
-#endif
 
 			for(std::size_t i = 0; i < Count; ++i)
 			{
@@ -115,10 +101,6 @@ namespace log2_
 				_BitScanReverse(&Tmp.w, i);
 				Result[i] = glm::ivec4(Tmp);
 			}
-
-#if GLM_COMPILER & GLM_COMPILER_VC
-#	pragma warning(pop)
-#endif
 
 			std::clock_t End = clock();
 
@@ -132,11 +114,6 @@ namespace log2_
 
 			std::clock_t Begin = clock();
 
-#if GLM_COMPILER& GLM_COMPILER_VC
-#	pragma warning(push)
-#	pragma warning(disable: 4267)
-#endif
-
 			for(std::size_t i = 0; i < Count; ++i)
 			{
 				_BitScanReverse(&Result[i].x, i);
@@ -144,10 +121,6 @@ namespace log2_
 				_BitScanReverse(&Result[i].z, i);
 				_BitScanReverse(&Result[i].w, i);
 			}
-
-#if GLM_COMPILER & GLM_COMPILER_VC
-#	pragma warning(pop)
-#endif
 
 			std::clock_t End = clock();
 
@@ -161,11 +134,6 @@ namespace log2_
 
 			std::clock_t Begin = clock();
 
-#if GLM_COMPILER& GLM_COMPILER_VC
-#	pragma warning(push)
-#	pragma warning(disable: 4267)
-#endif
-
 			for(std::size_t i = 0; i < Count; ++i)
 			{
 				_BitScanReverse(reinterpret_cast<unsigned long*>(&Result[i].x), i);
@@ -174,20 +142,12 @@ namespace log2_
 				_BitScanReverse(reinterpret_cast<unsigned long*>(&Result[i].w), i);
 			}
 
-#if GLM_COMPILER & GLM_COMPILER_VC
-#	pragma warning(pop)
-#endif
-
 			std::clock_t End = clock();
 
 			std::printf("glm::log2<ivec4> reinterpret: %d clocks\n", static_cast<int>(End - Begin));
 		}
 #		endif//GLM_HAS_BITSCAN_WINDOWS
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wsign-conversion"
-#endif
 		{
 			std::vector<float> Result;
 			Result.resize(Count);
@@ -201,14 +161,7 @@ namespace log2_
 
 			std::printf("glm::log2<float>: %d clocks\n", static_cast<int>(End - Begin));
 		}
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wsign-conversion"
-#endif
 		{
 			std::vector<glm::vec4> Result;
 			Result.resize(Count);
@@ -222,9 +175,6 @@ namespace log2_
 
 			std::printf("glm::log2<vec4>: %d clocks\n", static_cast<int>(End - Begin));
 		}
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
 
 		return Error;
 	}
@@ -232,7 +182,7 @@ namespace log2_
 
 namespace iround
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -250,7 +200,7 @@ namespace iround
 
 namespace uround
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -274,8 +224,10 @@ int main()
 	Error += ::iround::test();
 	Error += ::uround::test();
 
-	std::size_t const Samples(1000);
-	Error += ::log2_::perf(Samples);
+#	ifdef NDEBUG
+		std::size_t const Samples(1000);
+		Error += ::log2_::perf(Samples);
+#	endif//NDEBUG
 
 	return Error;
 }

@@ -3,11 +3,9 @@
 #include <cstdlib>     // To define "exit", req'd by XLC.
 #include <ctime>
 
-#ifdef NDEBUG
-
 #define LE 1            // 1 for little-endian, 0 for big-endian.
 
-static int pop(unsigned x) {
+int pop(unsigned x) {
    x = x - ((x >> 1) & 0x55555555);
    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
    x = (x + (x >> 4)) & 0x0F0F0F0F;
@@ -16,7 +14,7 @@ static int pop(unsigned x) {
    return x >> 24;
 }
 
-static int nlz1(unsigned x) {
+int nlz1(unsigned x) {
    int n;
 
    if (x == 0) return(32);
@@ -29,7 +27,7 @@ static int nlz1(unsigned x) {
    return n;
 }
 
-static int nlz1a(unsigned x) {
+int nlz1a(unsigned x) {
    int n;
 
 /* if (x == 0) return(32); */
@@ -39,12 +37,12 @@ static int nlz1a(unsigned x) {
    if ((x >> 24) == 0) {n = n + 8; x = x << 8;}
    if ((x >> 28) == 0) {n = n + 4; x = x << 4;}
    if ((x >> 30) == 0) {n = n + 2; x = x << 2;}
-   n = n - static_cast<int>(x >> 31);
+   n = n - (x >> 31);
    return n;
 }
 // On basic Risc, 12 to 20 instructions.
 
-static int nlz2(unsigned x) {
+int nlz2(unsigned x) {
    unsigned y;
    int n;
 
@@ -54,12 +52,12 @@ static int nlz2(unsigned x) {
    y = x >> 4;  if (y != 0) {n = n - 4;  x = y;}
    y = x >> 2;  if (y != 0) {n = n - 2;  x = y;}
    y = x >> 1;  if (y != 0) return n - 2;
-   return n - static_cast<int>(x);
+   return n - x;
 }
 
 // As above but coded as a loop for compactness:
 // 23 to 33 basic Risc instructions.
-static int nlz2a(unsigned x) {
+int nlz2a(unsigned x) {
    unsigned y;
    int n, c;
 
@@ -69,15 +67,15 @@ static int nlz2a(unsigned x) {
       y = x >> c;  if (y != 0) {n = n - c;  x = y;}
       c = c >> 1;
    } while (c != 0);
-   return n - static_cast<int>(x);
+   return n - x;
 }
 
-static int nlz3(unsigned x) {
+int nlz3(int x) {
    int y, n;
 
    n = 0;
-   y = static_cast<int>(x);
-L: if (x > 0x7fffffff) return n;
+   y = x;
+L: if (x < 0) return n;
    if (y == 0) return 32 - n;
    n = n + 1;
    x = x << 1;
@@ -85,12 +83,7 @@ L: if (x > 0x7fffffff) return n;
    goto L;
 }
 
-#if GLM_COMPILER & GLM_COMPILER_VC
-#	pragma warning(push)
-#	pragma warning(disable : 4146)
-#endif
-
-static int nlz4(unsigned x) {
+int nlz4(unsigned x) {
    int y, m, n;
 
    y = -(x >> 16);      // If left half of x is 0,
@@ -98,19 +91,19 @@ static int nlz4(unsigned x) {
    n = 16 - m;          // is nonzero, set n = 0 and
    x = x >> m;          // shift x right 16.
                         // Now x is of the form 0000xxxx.
-   y = static_cast<int>(x) - 0x100;
-   m = (y >> 16) & 8;   // If positions 8-15 are 0,
-   n = n + m;           // add 8 to n and shift x left 8.
+   y = x - 0x100;       // If positions 8-15 are 0,
+   m = (y >> 16) & 8;   // add 8 to n and shift x left 8.
+   n = n + m;
    x = x << m;
 
-   y = static_cast<int>(x) - 0x1000;
-   m = (y >> 16) & 4;   // If positions 12-15 are 0,
-   n = n + m;           // add 4 to n and shift x left 4.
+   y = x - 0x1000;      // If positions 12-15 are 0,
+   m = (y >> 16) & 4;   // add 4 to n and shift x left 4.
+   n = n + m;
    x = x << m;
 
-   y = static_cast<int>(x) - 0x4000;
-   m = (y >> 16) & 2;   // If positions 14-15 are 0,
-   n = n + m;           // add 2 to n and shift x left 2.
+   y = x - 0x4000;      // If positions 14-15 are 0,
+   m = (y >> 16) & 2;   // add 2 to n and shift x left 2.
+   n = n + m;
    x = x << m;
 
    y = x >> 14;         // Set y = 0, 1, 2, or 3.
@@ -118,11 +111,7 @@ static int nlz4(unsigned x) {
    return n + 2 - m;
 }
 
-#if(GLM_COMPILER & GLM_COMPILER_VC)
-#	pragma warning(pop)
-#endif
-
-static int nlz5(unsigned x) {
+int nlz5(unsigned x) {
    int pop(unsigned x);
 
    x = x | (x >> 1);
@@ -149,7 +138,7 @@ gcc/AIX, and gcc/NT, at some optimization levels.
    BTW, these programs use the "anonymous union" feature of C++, not
 available in C. */
 
-static int nlz6(unsigned k)
+int nlz6(unsigned k)
 {
 	union {
 		unsigned asInt[2];
@@ -162,7 +151,7 @@ static int nlz6(unsigned k)
 	return n;
 }
 
-static int nlz7(unsigned k)
+int nlz7(unsigned k)
 {
 	union {
 		unsigned asInt[2];
@@ -185,7 +174,7 @@ static int nlz7(unsigned k)
                         FFFFFF80 <= k <= FFFFFFFF.
    For k = 0 it gives 158, and for the other values it is too low by 1. */
 
-static int nlz8(unsigned k)
+int nlz8(unsigned k)
 {
 	union {
 		unsigned asInt;
@@ -207,7 +196,7 @@ expressions (see "Using and Porting GNU CC", by Richard M. Stallman
 possibility that the macro argument will conflict with one of its local
 variables, e.g., NLZ(k). */
 
-static int nlz9(unsigned k)
+int nlz9(unsigned k)
 {
 	union {
 		unsigned asInt;
@@ -241,7 +230,7 @@ multiplication expanded into shifts and adds, but the table size is
 getting a bit large). */
 
 #define u 99
-static int nlz10(unsigned x)
+int nlz10(unsigned x)
 {
 	static char table[64] =
 		{32,31, u,16, u,30, 3, u,  15, u, u, u,29,10, 2, u,
@@ -261,7 +250,7 @@ static int nlz10(unsigned x)
 /* Harley's algorithm with multiply expanded.
 19 elementary ops plus an indexed load. */
 
-static int nlz10a(unsigned x)
+int nlz10a(unsigned x)
 {
 	static char table[64] =
 		{32,31, u,16, u,30, 3, u,  15, u, u, u,29,10, 2, u,
@@ -285,7 +274,7 @@ static int nlz10a(unsigned x)
 17 elementary ops plus an indexed load, if the machine
 has "and not." */
 
-static int nlz10b(unsigned x)
+int nlz10b(unsigned x)
 {
 	static char table[64] =
 		{32,20,19, u, u,18, u, 7,  10,17, u, u,14, u, 6, u,
@@ -305,20 +294,17 @@ static int nlz10b(unsigned x)
 	return table[x >> 26];
 }
 
-static int errors;
-static void error(unsigned x, int y)
+int errors;
+void error(int x, int y)
 {
 	errors = errors + 1;
 	std::printf("Error for x = %08x, got %d\n", x, y);
 }
 
-#if defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable: 4389)  // nonstandard extension used : nameless struct/union
-#endif
-
 int main()
 {
+#	ifdef NDEBUG
+
 	int i, n;
 	static unsigned test[] = {0,32, 1,31, 2,30, 3,30, 4,29, 5,29, 6,29,
 		7,29, 8,28, 9,28, 16,27, 32,26, 64,25, 128,24, 255,24, 256,23,
@@ -338,7 +324,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz1(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz1(test[i]));}
+		if (nlz1(test[i]) != test[i+1]) error(test[i], nlz1(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz1: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -346,7 +332,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz1a(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz1a(test[i]));}
+		if (nlz1a(test[i]) != test[i+1]) error(test[i], nlz1a(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz1a: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -354,7 +340,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz2(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz2(test[i]));}
+		if (nlz2(test[i]) != test[i+1]) error(test[i], nlz2(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz2: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -362,7 +348,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz2a(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz2a(test[i]));}
+		if (nlz2a(test[i]) != test[i+1]) error(test[i], nlz2a(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz2a: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -370,7 +356,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz3(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz3(test[i]));}
+		if (nlz3(test[i]) != test[i+1]) error(test[i], nlz3(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz3: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -378,7 +364,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz4(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz4(test[i]));}
+		if (nlz4(test[i]) != test[i+1]) error(test[i], nlz4(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz4: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -386,7 +372,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz5(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz5(test[i]));}
+		if (nlz5(test[i]) != test[i+1]) error(test[i], nlz5(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz5: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -394,7 +380,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz6(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz6(test[i]));}
+		if (nlz6(test[i]) != test[i+1]) error(test[i], nlz6(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz6: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -402,7 +388,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz7(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz7(test[i]));}
+		if (nlz7(test[i]) != test[i+1]) error(test[i], nlz7(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz7: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -410,7 +396,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz8(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz8(test[i]));}
+		if (nlz8(test[i]) != test[i+1]) error(test[i], nlz8(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz8: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -418,7 +404,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz9(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz9(test[i]));}
+		if (nlz9(test[i]) != test[i+1]) error(test[i], nlz9(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz9: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -426,7 +412,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz10(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz10(test[i]));}
+		if (nlz10(test[i]) != test[i+1]) error(test[i], nlz10(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz10: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -434,7 +420,7 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz10a(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz10a(test[i]));}
+		if (nlz10a(test[i]) != test[i+1]) error(test[i], nlz10a(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz10a: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
@@ -442,24 +428,13 @@ int main()
 	TimestampBeg = std::clock();
 	for (std::size_t k = 0; k < Count; ++k)
 	for (i = 0; i < n; i += 2) {
-		if (nlz10b(test[i]) != static_cast<int>(test[i + 1])) error(test[i], nlz10b(test[i]));}
+		if (nlz10b(test[i]) != test[i+1]) error(test[i], nlz10b(test[i]));}
 	TimestampEnd = std::clock();
 
 	std::printf("nlz10b: %d clocks\n", static_cast<int>(TimestampEnd - TimestampBeg));
 
 	if (errors == 0)
 		std::printf("Passed all %d cases.\n", static_cast<int>(sizeof(test)/8));
+
+#	endif//NDEBUG
 }
-
-#if defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
-
-#else
-
-int main()
-{
-	return 0;
-}
-
-#endif//NDEBUG

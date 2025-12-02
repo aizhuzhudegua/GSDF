@@ -13,16 +13,21 @@ import torch
 from functools import reduce
 import numpy as np
 from torch_scatter import scatter_max
-from gaussian_splatting.utils.general_utils import inverse_sigmoid, get_expon_lr_func
+from utils.general_utils import inverse_sigmoid, get_expon_lr_func
 from torch import nn
 import os
-from gaussian_splatting.utils.system_utils import mkdir_p
+from torch.utils.cpp_extension import load
+from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from simple_knn._C import distCUDA2
-from gaussian_splatting.utils.graphics_utils import BasicPointCloud
-from gaussian_splatting.utils.general_utils import strip_symmetric, build_scaling_rotation
+from utils.graphics_utils import BasicPointCloud
+from utils.general_utils import strip_symmetric, build_scaling_rotation
+from utils.ref_utils import generate_ide_fn
+from scene.embedding import Embedding
 
-    
+TINT_ROUGH_SEP = True
+HYBRID_IMP_2 = False
+
 class GaussianModel:
 
     def setup_functions(self):
@@ -42,6 +47,40 @@ class GaussianModel:
 
         self.rotation_activation = torch.nn.functional.normalize
 
+    def setup_dimension(self):
+        # Branching factors: distance, using view, using volumes
+        # Appearance dim handled outside of this function.
+
+        # Attributes: opacity, covariance, color
+
+        # Distance
+        opacity_dist_dim = 1 if self.add_opacity_dist else 0
+        cov_dist_dim = 1 if self.add_cov_dist else 0
+        color_dist_dim = 1 if self.add_color_dist else 0
+
+        # View
+        opacity_view_dim = 3
+        cov_view_dim = 3
+        color_view_dim = 3
+
+        # Original Implementation
+        self.opacity_dim = self.feat_dim + opacity_dist_dim + opacity_view_dim
+        self.cov_dim = self.feat_dim + cov_dist_dim + cov_view_dim
+        self.color_dim = self.feat_dim + color_dist_dim + color_view_dim
+
+        if self.enable_idiv:
+            self.idiv_dim = self.color_dim + 1
+        if self.ref:
+            self.tint_dim = self.color_dim + 1
+            self.rough_dim = self.color_dim + 1
+            ide_dim = 0
+            if self.deg_view == 4:
+                ide_dim = 1 + 38
+            elif self.deg_view == 5:
+                ide_dim = 1 + 72
+            else:
+                raise NotImplementedError('Only support IDE degree 4 or 5')
+            self.spec_dim = self.color_dim + ide_dim + 1
 
     def __init__(self, 
                  feat_dim: int=32, 
@@ -50,8 +89,18 @@ class GaussianModel:
                  update_depth: int=3, 
                  update_init_factor: int=100,
                  update_hierachy_factor: int=4,
-                 use_feat_bank = False,
-                 use_tcnn=False):
+                 use_feat_bank : bool = False,
+                 appearance_dim : int = 32,
+                 ratio : int = 1,
+                 add_opacity_dist : bool = False,
+                 add_cov_dist : bool = False,
+                 add_color_dist : bool = False,
+                 idiv : bool = False,
+                 ref : bool = False,
+                 enable_idiv_iter : int = 5000,
+                 enable_ref_iter : int = 200,
+                 deg_view : int = 5,
+                 ):
 
         self.feat_dim = feat_dim
         self.n_offsets = n_offsets
@@ -60,7 +109,22 @@ class GaussianModel:
         self.update_init_factor = update_init_factor
         self.update_hierachy_factor = update_hierachy_factor
         self.use_feat_bank = use_feat_bank
-        self.use_tcnn = use_tcnn
+
+        self.appearance_dim = appearance_dim
+        self.embedding_appearance = None
+        self.ratio = ratio
+        self.add_opacity_dist = add_opacity_dist
+        self.add_cov_dist = add_cov_dist
+        self.add_color_dist = add_color_dist
+
+        # New Mode
+        self.idiv = idiv
+        self.enable_idiv = idiv
+        self.enable_idiv_iter = enable_idiv_iter
+        self.ref = ref
+        self.enable_ref = ref
+        self.enable_ref_iter = enable_ref_iter
+        self.deg_view = deg_view
 
         self._anchor = torch.empty(0)
         self._offset = torch.empty(0)
@@ -74,7 +138,6 @@ class GaussianModel:
         self.max_radii2D = torch.empty(0)
         
         self.offset_gradient_accum = torch.empty(0)
-        # self.offset_sdf_accum=torch.empty(0)
         self.offset_denom = torch.empty(0)
 
         self.anchor_demon = torch.empty(0)
@@ -83,89 +146,113 @@ class GaussianModel:
         self.percent_dense = 0
         self.spatial_lr_scale = 0
         self.setup_functions()
+        self.setup_dimension()
 
         if self.use_feat_bank:
-                self.mlp_feature_bank = nn.Sequential(
-                    nn.Linear(3+1, feat_dim),
-                    nn.ReLU(True),
-                    nn.Linear(feat_dim, 3),
-                    nn.Softmax(dim=1)
-                ).cuda()
-        
-        self.mlp_opacity = nn.Sequential(
-                # nn.Linear(feat_dim+3+1, feat_dim),
-                nn.Linear(feat_dim+3, feat_dim),
-
+            self.mlp_feature_bank = nn.Sequential(
+                nn.Linear(3+1, feat_dim),
                 nn.ReLU(True),
-                nn.Linear(feat_dim, n_offsets),
-                nn.Tanh()
+                nn.Linear(feat_dim, 3),
+                nn.Softmax(dim=1)
             ).cuda()
 
-        self.mlp_anchor_normals = nn.Sequential(
-            nn.Linear(feat_dim, feat_dim),
+        self.mlp_opacity = nn.Sequential(
+            nn.Linear(self.opacity_dim, feat_dim),
             nn.ReLU(True),
-            nn.Linear(feat_dim, 3),
+            nn.Linear(feat_dim, n_offsets),
             nn.Tanh()
         ).cuda()
 
-        if self.use_tcnn:
-            
-            import tinycudann as tcnn
+        self.mlp_cov = nn.Sequential(
+            nn.Linear(self.cov_dim, feat_dim),
+            nn.ReLU(True),
+            nn.Linear(feat_dim, 7*self.n_offsets),
+        ).cuda()
 
-            mlp_cov_config={"otype": "FullyFusedMLP",
-                         "activation": "ReLU",
-                         "output_activation": "None",
-                         "n_neurons": feat_dim,
-                         "n_hidden_layers": 1}
-            self.mlp_cov = tcnn.Network(n_input_dims=feat_dim+3,
-                                     n_output_dims=7*self.n_offsets,
-                                     network_config=mlp_cov_config)
-            
-            mlp_color_config={"otype": "FullyFusedMLP",
-                         "activation": "ReLU",
-                         "output_activation": "Sigmoid",
-                         "n_neurons": feat_dim,
-                         "n_hidden_layers": 1}
-            self.mlp_color = tcnn.Network(n_input_dims=feat_dim+3,
-                                     n_output_dims=3*self.n_offsets,
-                                     network_config=mlp_color_config)
-            
-        else:
-            self.mlp_cov = nn.Sequential(
-                # nn.Linear(feat_dim+3+1, feat_dim),
-                nn.Linear(feat_dim+3, feat_dim),
+        self.mlp_color = nn.Sequential(
+            nn.Linear(self.color_dim+self.appearance_dim, feat_dim),
+            nn.ReLU(True),
+            nn.Linear(feat_dim, 3*self.n_offsets),
+            nn.Sigmoid()
+        ).cuda()
 
+        if self.enable_idiv:
+            # idiv: directional vector, unnormalized
+            # Here we assume natural lighting and reduce the rank of the IDIV.
+            self.mlp_idiv = nn.Sequential(
+                nn.Linear(self.idiv_dim+self.appearance_dim, feat_dim),
                 nn.ReLU(True),
-                nn.Linear(feat_dim, 7*self.n_offsets),
+                nn.Linear(feat_dim, 3*self.n_offsets)
             ).cuda()
 
-            self.mlp_color = nn.Sequential(
-                # nn.Linear(feat_dim+3+1, feat_dim),
-                nn.Linear(feat_dim+3, feat_dim),
+            torch.nn.init.constant_(self.mlp_idiv[-1].bias, 1.0)
 
+        if self.ref:
+            self.ide_fn = generate_ide_fn(self.deg_view)
+
+            if TINT_ROUGH_SEP:
+                self.mlp_tint = nn.Sequential(
+                    nn.Linear(self.tint_dim+self.appearance_dim, feat_dim),
+                    nn.ReLU(True),
+                    nn.Linear(feat_dim, 3*self.n_offsets),
+                    nn.Softplus()
+                ).cuda()
+                self.mlp_roughness = nn.Sequential(
+                    nn.Linear(self.rough_dim+self.appearance_dim, feat_dim),
+                    nn.ReLU(True),
+                    nn.Linear(feat_dim, 1*self.n_offsets),
+                    nn.Softplus()
+                ).cuda()
+
+            else: # [tint, roughness]
+                self.mlp_tint = nn.Sequential(
+                    nn.Linear(self.tint_dim+self.appearance_dim, feat_dim),
+                    nn.ReLU(True),
+                    nn.Linear(feat_dim, 4*self.n_offsets),
+                    nn.Softplus()
+                ).cuda()
+
+            # Inputs: feature (feat_dim + 3), n*view (1), IDE (38 or 72), others
+            self.mlp_specular = nn.Sequential(
+                nn.Linear(self.spec_dim+self.appearance_dim, feat_dim),
                 nn.ReLU(True),
-                nn.Linear(feat_dim, 3*self.n_offsets),
-                nn.Sigmoid()
+                nn.Linear(feat_dim, 3),
+                nn.Softplus()
             ).cuda()
-
 
     def eval(self):
         self.mlp_opacity.eval()
-        self.mlp_anchor_normals.eval()
         self.mlp_cov.eval()
         self.mlp_color.eval()
-        
+        if self.appearance_dim > 0:
+            self.embedding_appearance.eval()
         if self.use_feat_bank:
             self.mlp_feature_bank.eval()
+        if self.idiv:
+            self.enable_idiv = True
+            self.mlp_idiv.eval()
+        if self.ref:
+            self.enable_ref = True
+            self.mlp_tint.eval()
+            if TINT_ROUGH_SEP:
+                self.mlp_roughness.eval()
+            self.mlp_specular.eval()
 
     def train(self):
         self.mlp_opacity.train()
-        self.mlp_anchor_normals.train()
         self.mlp_cov.train()
         self.mlp_color.train()
-        
-        if self.use_feat_bank:                   
+        if self.appearance_dim > 0:
+            self.embedding_appearance.train()
+        if self.use_feat_bank:
             self.mlp_feature_bank.train()
+        if self.enable_idiv:
+            self.mlp_idiv.train()
+        if self.ref:
+            self.mlp_tint.train()
+            if TINT_ROUGH_SEP:
+                self.mlp_roughness.train()
+            self.mlp_specular.train()
 
     def capture(self):
         return (
@@ -197,6 +284,13 @@ class GaussianModel:
         self.denom = denom
         self.optimizer.load_state_dict(opt_dict)
 
+    def set_appearance(self, num_cameras):
+        if self.appearance_dim > 0:
+            self.embedding_appearance = Embedding(num_cameras, self.appearance_dim).cuda()
+
+    @property
+    def get_appearance(self):
+        return self.embedding_appearance
 
     @property
     def get_scaling(self):
@@ -209,10 +303,6 @@ class GaussianModel:
     @property
     def get_opacity_mlp(self):
         return self.mlp_opacity
-
-    @property
-    def get_anchor_normal_mlp(self):
-        return self.mlp_anchor_normals
     
     @property
     def get_cov_mlp(self):
@@ -221,7 +311,30 @@ class GaussianModel:
     @property
     def get_color_mlp(self):
         return self.mlp_color
-    
+
+    @property
+    def get_idiv_mlp(self):
+        return self.mlp_idiv
+
+    # @property
+    # def get_mid_feature_mlp(self):
+    #     if HYBRID_IMP_2 and self.enable_idiv and self.ref:
+    #         return self.mlp_mid_feature
+    #     return None
+
+    @property
+    def get_tint_mlp(self):
+        return self.mlp_tint
+
+    if TINT_ROUGH_SEP:
+        @property
+        def get_roughness_mlp(self):
+            return self.mlp_roughness
+
+    @property
+    def get_specular_mlp(self):
+        return self.mlp_specular
+
     @property
     def get_rotation(self):
         return self.rotation_activation(self._rotation)
@@ -252,12 +365,7 @@ class GaussianModel:
 
     def create_from_pcd(self, pcd : BasicPointCloud, spatial_lr_scale : float):
         self.spatial_lr_scale = spatial_lr_scale
-        ratio = 1
-        points = pcd.points[::ratio]
-        
-        # points = (np.random.rand(points.shape[0], 3)-0.5)*20.0
-        
-        # points = (np.random.rand(*points.shape)-0.5) * (points.max(axis=0)-points.min(axis=0))
+        points = pcd.points[::self.ratio]
 
         if self.voxel_size <= 0:
             init_points = torch.tensor(points).float().cuda()
@@ -294,20 +402,15 @@ class GaussianModel:
         self._opacity = nn.Parameter(opacities.requires_grad_(False))
         self.max_radii2D = torch.zeros((self.get_anchor.shape[0]), device="cuda")
 
-
     def training_setup(self, training_args):
         self.percent_dense = training_args.percent_dense
 
         self.opacity_accum = torch.zeros((self.get_anchor.shape[0], 1), device="cuda")
 
         self.offset_gradient_accum = torch.zeros((self.get_anchor.shape[0]*self.n_offsets, 1), device="cuda")
-        # self.offset_sdf_accum = torch.zeros((self.get_anchor.shape[0]*self.n_offsets, 1), device="cuda")
-
         self.offset_denom = torch.zeros((self.get_anchor.shape[0]*self.n_offsets, 1), device="cuda")
         self.anchor_demon = torch.zeros((self.get_anchor.shape[0], 1), device="cuda")
 
-        
-        
         if self.use_feat_bank:
             l = [
                 {'params': [self._anchor], 'lr': training_args.position_lr_init * self.spatial_lr_scale, "name": "anchor"},
@@ -318,10 +421,27 @@ class GaussianModel:
                 {'params': [self._rotation], 'lr': training_args.rotation_lr, "name": "rotation"},
                 
                 {'params': self.mlp_opacity.parameters(), 'lr': training_args.mlp_opacity_lr_init, "name": "mlp_opacity"},
-                {'params': self.mlp_anchor_normals.parameters(), 'lr': training_args.offset_lr_init * self.spatial_lr_scale, "name": "mlp_anchor_normals"},
                 {'params': self.mlp_feature_bank.parameters(), 'lr': training_args.mlp_featurebank_lr_init, "name": "mlp_featurebank"},
                 {'params': self.mlp_cov.parameters(), 'lr': training_args.mlp_cov_lr_init, "name": "mlp_cov"},
                 {'params': self.mlp_color.parameters(), 'lr': training_args.mlp_color_lr_init, "name": "mlp_color"},
+            ]
+            if self.appearance_dim > 0:
+                l.extend([
+                    {'params': self.embedding_appearance.parameters(), 'lr': training_args.appearance_lr_init, "name": "embedding_appearance"},
+                ])
+        elif self.appearance_dim > 0:
+            l = [
+                {'params': [self._anchor], 'lr': training_args.position_lr_init * self.spatial_lr_scale, "name": "anchor"},
+                {'params': [self._offset], 'lr': training_args.offset_lr_init * self.spatial_lr_scale, "name": "offset"},
+                {'params': [self._anchor_feat], 'lr': training_args.feature_lr, "name": "anchor_feat"},
+                {'params': [self._opacity], 'lr': training_args.opacity_lr, "name": "opacity"},
+                {'params': [self._scaling], 'lr': training_args.scaling_lr, "name": "scaling"},
+                {'params': [self._rotation], 'lr': training_args.rotation_lr, "name": "rotation"},
+
+                {'params': self.mlp_opacity.parameters(), 'lr': training_args.mlp_opacity_lr_init, "name": "mlp_opacity"},
+                {'params': self.mlp_cov.parameters(), 'lr': training_args.mlp_cov_lr_init, "name": "mlp_cov"},
+                {'params': self.mlp_color.parameters(), 'lr': training_args.mlp_color_lr_init, "name": "mlp_color"},
+                {'params': self.embedding_appearance.parameters(), 'lr': training_args.appearance_lr_init, "name": "embedding_appearance"},
             ]
         else:
             l = [
@@ -332,11 +452,32 @@ class GaussianModel:
                 {'params': [self._scaling], 'lr': training_args.scaling_lr, "name": "scaling"},
                 {'params': [self._rotation], 'lr': training_args.rotation_lr, "name": "rotation"},
 
-                {'params': self.mlp_anchor_normals.parameters(), 'lr': training_args.offset_lr_init * self.spatial_lr_scale, "name": "mlp_anchor_normals"},
                 {'params': self.mlp_opacity.parameters(), 'lr': training_args.mlp_opacity_lr_init, "name": "mlp_opacity"},
                 {'params': self.mlp_cov.parameters(), 'lr': training_args.mlp_cov_lr_init, "name": "mlp_cov"},
                 {'params': self.mlp_color.parameters(), 'lr': training_args.mlp_color_lr_init, "name": "mlp_color"},
             ]
+
+        if self.enable_idiv:
+            l.extend([
+                {'params': self.mlp_idiv.parameters(), 'lr': training_args.mlp_idiv_lr_init, "name": "mlp_idiv"}
+            ])
+
+        if self.ref and TINT_ROUGH_SEP:
+            l.extend([
+                {'params': self.mlp_tint.parameters(), 'lr': training_args.mlp_tint_lr_init, "name": "mlp_tint"},
+                {'params': self.mlp_roughness.parameters(), 'lr': training_args.mlp_roughness_lr_init, "name": "mlp_roughness"},
+                {'params': self.mlp_specular.parameters(), 'lr': training_args.mlp_specular_lr_init, "name": "mlp_specular"}
+            ])
+        elif self.ref:
+            l.extend([
+                {'params': self.mlp_tint.parameters(), 'lr': training_args.mlp_tint_lr_init, "name": "mlp_tint"},
+                {'params': self.mlp_specular.parameters(), 'lr': training_args.mlp_specular_lr_init, "name": "mlp_specular"}
+            ])
+
+        # if HYBRID_IMP_2 and self.enable_idiv and self.ref:
+        #     l.extend([
+        #         {'params': self.mlp_mid_feature.parameters(), 'lr': training_args.mlp_tint_lr_init, "name": "mlp_idiv"}
+        #     ])
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
         self.anchor_scheduler_args = get_expon_lr_func(lr_init=training_args.position_lr_init*self.spatial_lr_scale,
@@ -352,11 +493,6 @@ class GaussianModel:
                                                     lr_final=training_args.mlp_opacity_lr_final,
                                                     lr_delay_mult=training_args.mlp_opacity_lr_delay_mult,
                                                     max_steps=training_args.mlp_opacity_lr_max_steps)
-
-        self.mlp_anchor_normals_scheduler_args = get_expon_lr_func(lr_init=training_args.offset_lr_init,
-                                                    lr_final=training_args.offset_lr_final,
-                                                    lr_delay_mult=training_args.offset_lr_delay_mult,
-                                                    max_steps=training_args.offset_lr_max_steps)
         
         self.mlp_cov_scheduler_args = get_expon_lr_func(lr_init=training_args.mlp_cov_lr_init,
                                                     lr_final=training_args.mlp_cov_lr_final,
@@ -372,6 +508,48 @@ class GaussianModel:
                                                         lr_final=training_args.mlp_featurebank_lr_final,
                                                         lr_delay_mult=training_args.mlp_featurebank_lr_delay_mult,
                                                         max_steps=training_args.mlp_featurebank_lr_max_steps)
+        if self.appearance_dim > 0:
+            self.appearance_scheduler_args = get_expon_lr_func(lr_init=training_args.appearance_lr_init,
+                                                        lr_final=training_args.appearance_lr_final,
+                                                        lr_delay_mult=training_args.appearance_lr_delay_mult,
+                                                        max_steps=training_args.appearance_lr_max_steps)
+
+        if self.enable_idiv:
+            self.mlp_idiv_scheduler_args = get_expon_lr_func(lr_init=training_args.mlp_idiv_lr_init,
+                                                    lr_final=training_args.mlp_idiv_lr_final,
+                                                    lr_delay_mult=training_args.mlp_idiv_lr_delay_mult,
+                                                    max_steps=training_args.mlp_idiv_lr_max_steps)
+
+        if self.ref:
+            self.mlp_tint_scheduler_args = get_expon_lr_func(lr_init=training_args.mlp_tint_lr_init,
+                                                    lr_final=training_args.mlp_tint_lr_final,
+                                                    lr_delay_mult=training_args.mlp_tint_lr_delay_mult,
+                                                    max_steps=training_args.mlp_tint_lr_max_steps)
+            self.mlp_roughness_scheduler_args = get_expon_lr_func(lr_init=training_args.mlp_roughness_lr_init,
+                                                    lr_final=training_args.mlp_roughness_lr_final,
+                                                    lr_delay_mult=training_args.mlp_roughness_lr_delay_mult,
+                                                    max_steps=training_args.mlp_roughness_lr_max_steps)
+            self.mlp_specular_scheduler_args = get_expon_lr_func(lr_init=training_args.mlp_specular_lr_init,
+                                                    lr_final=training_args.mlp_specular_lr_final,
+                                                    lr_delay_mult=training_args.mlp_specular_lr_delay_mult,
+                                                    max_steps=training_args.mlp_specular_lr_max_steps)
+
+        # if HYBRID_IMP_2 and self.enable_idiv and self.ref:
+        #     self.mlp_mid_feature_scheduler_args = get_expon_lr_func(lr_init=training_args.mlp_tint_lr_init,
+        #                                             lr_final=training_args.mlp_tint_lr_final,
+        #                                             lr_delay_mult=training_args.mlp_tint_lr_delay_mult,
+        #                                             max_steps=training_args.mlp_tint_lr_max_steps)
+
+    def update_render_status(self, iteration):
+        if iteration < self.enable_ref_iter:
+            self.enable_ref = False
+        else:
+            self.enable_ref = self.ref
+        
+        if iteration < self.enable_idiv_iter:
+            self.enable_idiv = False
+        else:
+            self.enable_idiv = self.idiv
 
     def update_learning_rate(self, iteration):
         ''' Learning rate scheduling per step '''
@@ -385,18 +563,34 @@ class GaussianModel:
             if param_group["name"] == "mlp_opacity":
                 lr = self.mlp_opacity_scheduler_args(iteration)
                 param_group['lr'] = lr
-            if param_group["name"] == "mlp_anchor_normals":
-                lr = self.mlp_anchor_normals_scheduler_args(iteration)
-                param_group['lr'] = lr
-            if self.use_feat_bank and param_group["name"] == "mlp_featurebank":
-                lr = self.mlp_featurebank_scheduler_args(iteration)
-                param_group['lr'] = lr
             if param_group["name"] == "mlp_cov":
                 lr = self.mlp_cov_scheduler_args(iteration)
                 param_group['lr'] = lr
             if param_group["name"] == "mlp_color":
                 lr = self.mlp_color_scheduler_args(iteration)
                 param_group['lr'] = lr
+            if self.use_feat_bank and param_group["name"] == "mlp_featurebank":
+                lr = self.mlp_featurebank_scheduler_args(iteration)
+                param_group['lr'] = lr
+            if self.appearance_dim > 0 and param_group["name"] == "embedding_appearance":
+                lr = self.appearance_scheduler_args(iteration)
+                param_group['lr'] = lr
+            if self.enable_idiv and param_group["name"] == "mlp_idiv":
+                lr = self.mlp_idiv_scheduler_args(iteration)
+                param_group['lr'] = lr
+            if self.ref and param_group["name"] == "mlp_tint":
+                lr = self.mlp_tint_scheduler_args(iteration)
+                param_group['lr'] = lr
+            if self.ref and param_group["name"] == "mlp_roughness":
+                lr = self.mlp_roughness_scheduler_args(iteration)
+                param_group['lr'] = lr
+            if self.ref and param_group["name"] == "mlp_specular":
+                lr = self.mlp_specular_scheduler_args(iteration)
+                param_group['lr'] = lr
+            # if HYBRID_IMP_2 and self.enable_idiv and self.ref and param_group["name"] == "mlp_mid_feature":
+            #     lr = self.mlp_mid_feature_scheduler_args(iteration)
+            #     param_group['lr'] = lr
+            
             
     def construct_list_of_attributes(self):
         l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
@@ -492,7 +686,10 @@ class GaussianModel:
     def cat_tensors_to_optimizer(self, tensors_dict):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
-            if 'mlp' in group['name'] or 'conv' in group['name'] or 'feat_base' in group['name']:
+            if  'mlp' in group['name'] or \
+                'conv' in group['name'] or \
+                'feat_base' in group['name'] or \
+                'embedding' in group['name']:
                 continue
             assert len(group["params"]) == 1
             extension_tensor = tensors_dict[group["name"]]
@@ -514,15 +711,7 @@ class GaussianModel:
 
 
     # statis grad information to guide liftting. 
-    def training_statis(self, viewspace_point_tensor, opacity, update_filter, offset_selection_mask, anchor_visible_mask, grad_threshold=0.0002):
-        # if xyz_sdf != None:
-        #     def simple_sdf_activate(x, sigma=0.01):
-        #         # return 1/torch.log(x.abs()+1)
-
-        #         return torch.exp(-x**2/sigma)
-            # def sdf_activate(x):
-            #     return torch.clamp(0.05/torch.log(x.abs()+1), max = 0.5) * grad_threshold
-                # return 0.002/(1+torch.exp(x.abs()))
+    def training_statis(self, viewspace_point_tensor, opacity, update_filter, offset_selection_mask, anchor_visible_mask):
         # update opacity stats
         temp_opacity = opacity.clone().view(-1).detach()
         temp_opacity[temp_opacity<0] = 0
@@ -539,30 +728,21 @@ class GaussianModel:
         combined_mask[anchor_visible_mask] = offset_selection_mask
         temp_mask = combined_mask.clone()
         combined_mask[temp_mask] = update_filter
-        # import pdb;pdb.set_trace()
-        # if xyz_sdf is not None:
-        #     # sdf_activated = sdf_activate(xyz_sdf.unsqueeze(dim=-1))
-        #     sdf_activated = simple_sdf_activate(xyz_sdf.unsqueeze(dim=-1))
-        #     # grad = (viewspace_point_tensor.grad + torch.clamp(0.00005*sdf_activated, max = 10*grad_threshold))[update_filter,:2]
-        #     # import pdb;pdb.set_trace()
-        #     grad = (viewspace_point_tensor.grad)[update_filter,:2]
-
-
-        #     # grad = (viewspace_point_tensor.grad + torch.clamp(0.05*sdf_activated, max = 0.5) * grad_threshold)[update_filter,:2]
-        # else:
-        grad = (viewspace_point_tensor.grad)[update_filter,:2]
-        # grad_norm = torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
-        grad_norm = torch.norm(grad, dim=-1, keepdim=True)
+        
+        grad_norm = torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.offset_gradient_accum[combined_mask] += grad_norm
         self.offset_denom[combined_mask] += 1
-        # import pdb;pdb.set_trace()
-        # if xyz_sdf is not None:
-        #     self.offset_sdf_accum[combined_mask] += anchor_sdf[update_filter] # .unsqueeze(dim=-1)
+
+        
+
         
     def _prune_anchor_optimizer(self, mask):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
-            if 'mlp' in group['name'] or 'conv' in group['name'] or 'feat_base' in group['name']:
+            if  'mlp' in group['name'] or \
+                'conv' in group['name'] or \
+                'feat_base' in group['name'] or \
+                'embedding' in group['name']:
                 continue
 
             stored_state = self.optimizer.state.get(group['params'][0], None)
@@ -701,110 +881,17 @@ class GaussianModel:
                 self._offset = optimizable_tensors["offset"]
                 self._opacity = optimizable_tensors["opacity"]
                 
-    def lift_sdf_sample_points_to_anchors(self, add_contents):
-        ## 
-        # count_new_anchors = 0
-
-        # for i in range(self.update_depth):
-        sample_points, sample_features = add_contents
-        size_factor = 1 # self.update_init_factor // (self.update_hierachy_factor**i)
-        cur_size = self.voxel_size*size_factor
-        
-        grid_coords = torch.round(self.get_anchor / cur_size).int()
-        
-
-        selected_xyz = sample_points
-        selected_features = sample_features
-        selected_grid_coords = torch.round(selected_xyz / cur_size).int()
-
-        selected_grid_coords_unique, inverse_indices = torch.unique(selected_grid_coords, return_inverse=True, dim=0)
-        # selected_features = scatter_max()
-
-        ## split data for reducing peak memory calling
-        use_chunk = True
-        if use_chunk:
-            chunk_size = 4096
-            max_iters = grid_coords.shape[0] // chunk_size + (1 if grid_coords.shape[0] % chunk_size != 0 else 0)
-            remove_duplicates_list = []
-            for i in range(max_iters):
-                cur_remove_duplicates = (selected_grid_coords_unique.unsqueeze(1) == grid_coords[i*chunk_size:(i+1)*chunk_size, :]).all(-1).any(-1).view(-1)
-                remove_duplicates_list.append(cur_remove_duplicates)
-            
-            remove_duplicates = reduce(torch.logical_or, remove_duplicates_list)
-        else:
-            remove_duplicates = (selected_grid_coords_unique.unsqueeze(1) == grid_coords).all(-1).any(-1).view(-1)
-
-        remove_duplicates = ~remove_duplicates
-        selected_xyz = selected_grid_coords_unique[remove_duplicates]*cur_size
-
-        
-        if selected_xyz.shape[0] > 0:
-            new_scaling = torch.ones_like(selected_xyz).repeat([1,2]).float().cuda()*cur_size # *0.05
-            new_scaling = torch.log(new_scaling)
-            new_rotation = torch.zeros([selected_xyz.shape[0], 4], device=selected_xyz.device).float()
-            new_rotation[:,0] = 1.0
-
-            new_opacities = inverse_sigmoid(0.1 * torch.ones((selected_xyz.shape[0], 1), dtype=torch.float, device="cuda"))
-            
-            new_feat = scatter_max(selected_features, inverse_indices.unsqueeze(1).expand(-1, self.feat_dim), dim=0)[0][remove_duplicates]
-
-            new_offsets = torch.zeros_like(selected_xyz).unsqueeze(dim=1).repeat([1,self.n_offsets,1]).float().cuda()
-
-            d = {
-                "anchor": selected_xyz,
-                "scaling": new_scaling,
-                "rotation": new_rotation,
-                "anchor_feat": new_feat,
-                "offset": new_offsets,
-                "opacity": new_opacities,
-            }
-
-            
-            
-            temp_anchor_demon = torch.cat([self.anchor_demon, torch.zeros([new_opacities.shape[0], 1], device='cuda').float()], dim=0)
-            del self.anchor_demon
-            self.anchor_demon = temp_anchor_demon
-
-            temp_opacity_accum = torch.cat([self.opacity_accum, torch.zeros([new_opacities.shape[0], 1], device='cuda').float()], dim=0)
-            del self.opacity_accum
-            self.opacity_accum = temp_opacity_accum
-
-            torch.cuda.empty_cache()
-            
-            optimizable_tensors = self.cat_tensors_to_optimizer(d)
-            self._anchor = optimizable_tensors["anchor"]
-            self._scaling = optimizable_tensors["scaling"]
-            self._rotation = optimizable_tensors["rotation"]
-            self._anchor_feat = optimizable_tensors["anchor_feat"]
-            self._offset = optimizable_tensors["offset"]
-            self._opacity = optimizable_tensors["opacity"]
 
 
-    def adjust_anchor(self, extent, add_contents=None, check_interval=100, success_threshold=0.8, grad_threshold=0.0002, min_opacity=0.005, xyz_sdf=None, anchor_sdf=None, inside_box=None, anchor_inside_box=None, growing_weight=0.0002):
-        
-        if xyz_sdf!=None:
-            # Activate function (Gaussian) for sdf. 
-            def simple_sdf_activate(x, sigma=0.01):
-                return torch.exp(-x**2/sigma)
+    def adjust_anchor(self, check_interval=100, success_threshold=0.8, grad_threshold=0.0002, min_opacity=0.005):
         # # adding anchors
         grads = self.offset_gradient_accum / self.offset_denom # [N*k, 1]
         grads[grads.isnan()] = 0.0
-
         grads_norm = torch.norm(grads, dim=-1)
-        
-        if xyz_sdf is not None:
-            xyz_sdf_activated = simple_sdf_activate(xyz_sdf)
-            xyz_sdf_activated[~inside_box] = 0.0
-            grow_alpha = growing_weight # 0.0002
-            print("grow_alpha:", grow_alpha)
-            weight_prune = 1
-            # update the grads_norm according to the sdf value
-            grads_norm  = grads_norm + grow_alpha * xyz_sdf_activated
-           
         offset_mask = (self.offset_denom > check_interval*success_threshold*0.5).squeeze(dim=1)
         
         self.anchor_growing(grads_norm, grad_threshold, offset_mask)
-
+        
         # update offset_denom
         self.offset_denom[offset_mask] = 0
         padding_offset_demon = torch.zeros([self.get_anchor.shape[0]*self.n_offsets - self.offset_denom.shape[0], 1],
@@ -818,27 +905,10 @@ class GaussianModel:
                                            device=self.offset_gradient_accum.device)
         self.offset_gradient_accum = torch.cat([self.offset_gradient_accum, padding_offset_gradient_accum], dim=0)
         
-        
-        anchor_opacity_sdf_accum = self.opacity_accum 
-
-        if anchor_sdf is not None:
-            
-            anchor_sdf_activated = simple_sdf_activate(anchor_sdf)
-            anchor_sdf_activated[~anchor_inside_box] = 1
-            padding_length = self.get_anchor.shape[0] - anchor_sdf_activated.shape[0]
-            padding_ones = torch.ones([padding_length]).to(self.get_anchor.device)
-            padded_anchor_sdf_activated = torch.cat([anchor_sdf_activated, padding_ones], dim=0)
-            #update the opacity_accum with the anchor sdf value.
-            anchor_opacity_sdf_accum = self.opacity_accum - weight_prune*self.anchor_demon *(1- padded_anchor_sdf_activated.unsqueeze(dim=1)) 
-
-        prune_mask = (anchor_opacity_sdf_accum < min_opacity*self.anchor_demon).squeeze(dim=1)
+        # # prune anchors
+        prune_mask = (self.opacity_accum < min_opacity*self.anchor_demon).squeeze(dim=1)
         anchors_mask = (self.anchor_demon > check_interval*success_threshold).squeeze(dim=1) # [N, 1]
         prune_mask = torch.logical_and(prune_mask, anchors_mask) # [N] 
-
-        scaling_mask= self.get_scaling.max(dim=1).values > 0.1 * extent
-        prune_mask = torch.logical_and(prune_mask, scaling_mask) # [N]
-
-
         
         # update offset_denom
         offset_denom = self.offset_denom.view([-1, self.n_offsets])[~prune_mask]
@@ -869,65 +939,119 @@ class GaussianModel:
         
         self.max_radii2D = torch.zeros((self.get_anchor.shape[0]), device="cuda")
 
-
-    def post_check(self, cams, pipe, background, prefilter_voxel=None, render=None):
-        # iterate over all poses, delete unused
-        self.opacity_accum = torch.zeros_like(self.opacity_accum)
-
-        visit_count = torch.zeros(self.get_anchor.shape[0], 1).to(self.get_anchor.device)
-        
-        # print(f"before, visit_count: {visit_count.sum()}, {visit_count.shape}")
-
-        for viewpoint_cam in cams:
-            voxel_visible_mask = prefilter_voxel(viewpoint_cam, self, pipe,background)
-
-            retain_grad = False
-            render_pkg = render(viewpoint_cam, self, pipe, background, visible_mask=voxel_visible_mask, retain_grad=retain_grad)
-
-            offset_selection_mask, scaling, opacity = render_pkg["selection_mask"], render_pkg["scaling"], render_pkg["neural_opacity"]
-
-            offset_selection_mask = offset_selection_mask.view([-1, self.n_offsets]).sum(dim=-1) # [m, 1]
-            
-            mapped_elements = torch.zeros(voxel_visible_mask.shape[0], dtype=torch.bool).to(visit_count.device)
-            mapped_elements[voxel_visible_mask] = offset_selection_mask>0
-
-            visit_count[mapped_elements] += 1
-        
-        valid_idx = (visit_count>1).squeeze(dim=-1)
-
-
-        self._anchor = self._anchor[valid_idx]
-        self._offset = self._offset[valid_idx]
-        self._anchor_feat = self._anchor_feat[valid_idx]
-        self._scaling = self._scaling[valid_idx]
-        self._rotation = self._rotation[valid_idx]
-        self._opacity = self._opacity[valid_idx]
-
-        torch.cuda.empty_cache()
-
-    def save_mlp_checkpoints(self,path):
+    def save_mlp_checkpoints(self, path, mode = 'split'):#split or unite
         mkdir_p(os.path.dirname(path))
-        
-        if self.use_feat_bank:
-            torch.save({
-                'opacity_mlp': self.mlp_opacity.state_dict(),
-                'anchor_normals_mlp': self.mlp_anchor_normals.state_dict(),
-                'mlp_feature_bank': self.mlp_feature_bank.state_dict(),
-                'cov_mlp': self.mlp_cov.state_dict(),
-                'color_mlp': self.mlp_color.state_dict()}, path)
+        if mode == 'split':
+            self.mlp_opacity.eval()
+            opacity_mlp = torch.jit.trace(self.mlp_opacity, (torch.rand(1, self.opacity_dim).cuda()))
+            opacity_mlp.save(os.path.join(path, 'opacity_mlp.pt'))
+            self.mlp_opacity.train()
+
+            self.mlp_cov.eval()
+            cov_mlp = torch.jit.trace(self.mlp_cov, (torch.rand(1, self.cov_dim).cuda()))
+            cov_mlp.save(os.path.join(path, 'cov_mlp.pt'))
+            self.mlp_cov.train()
+
+            self.mlp_color.eval()
+            color_mlp = torch.jit.trace(self.mlp_color, (torch.rand(1, self.color_dim+self.appearance_dim).cuda()))
+            color_mlp.save(os.path.join(path, 'color_mlp.pt'))
+            self.mlp_color.train()
+
+            if self.use_feat_bank:
+                self.mlp_feature_bank.eval()
+                feature_bank_mlp = torch.jit.trace(self.mlp_feature_bank, (torch.rand(1, 3+1).cuda()))
+                feature_bank_mlp.save(os.path.join(path, 'feature_bank_mlp.pt'))
+                self.mlp_feature_bank.train()
+
+            if self.appearance_dim:
+                self.embedding_appearance.eval()
+                emd = torch.jit.trace(self.embedding_appearance, (torch.zeros((1,), dtype=torch.long).cuda()))
+                emd.save(os.path.join(path, 'embedding_appearance.pt'))
+                self.embedding_appearance.train()
+
+            # if HYBRID_IMP_2 and self.enable_idiv and self.ref:
+            #     self.mlp_mid_feature.eval()
+            #     mid_feature_mlp = torch.jit.trace(self.mlp_mid_feature, (torch.rand(1, self.feat_dim+3+self.color_dist_dim+self.appearance_dim).cuda()))
+            #     mid_feature_mlp.save(os.path.join(path, 'mid_feature_mlp.pt'))
+            #     self.mlp_mid_feature.train()
+
+            #     self.mlp_idiv.eval()
+            #     idiv_mlp = torch.jit.trace(self.mlp_idiv, (torch.rand(1, self.feat_dim).cuda()))
+            #     idiv_mlp.save(os.path.join(path, 'idiv_mlp.pt'))
+            #     self.mlp_idiv.train()
+            if self.enable_idiv:
+                self.mlp_idiv.eval()
+                idiv_mlp = torch.jit.trace(self.mlp_idiv, (torch.rand(1, self.idiv_dim+self.appearance_dim).cuda()))
+                idiv_mlp.save(os.path.join(path, 'idiv_mlp.pt'))
+                self.mlp_idiv.train()
+
+            if self.ref:
+                self.mlp_tint.eval()
+                tint_mlp = torch.jit.trace(self.mlp_tint, (torch.rand(1, self.tint_dim+self.appearance_dim).cuda()))
+                tint_mlp.save(os.path.join(path, 'tint_mlp.pt'))
+                self.mlp_tint.train()
+
+                self.mlp_roughness.eval()
+                roughness_mlp = torch.jit.trace(self.mlp_roughness, (torch.rand(1, self.rough_dim+self.appearance_dim).cuda()))
+                roughness_mlp.save(os.path.join(path, 'roughness_mlp.pt'))
+                self.mlp_roughness.train()
+
+                self.mlp_specular.eval()
+                specular_mlp = torch.jit.trace(self.mlp_specular, (torch.rand(1, self.spec_dim+self.appearance_dim).cuda()))
+                specular_mlp.save(os.path.join(path, 'specular_mlp.pt'))
+                self.mlp_specular.train()
+
+        elif mode == 'unite':
+            if self.use_feat_bank:
+                torch.save({
+                    'opacity_mlp': self.mlp_opacity.state_dict(),
+                    'cov_mlp': self.mlp_cov.state_dict(),
+                    'color_mlp': self.mlp_color.state_dict(),
+                    'feature_bank_mlp': self.mlp_feature_bank.state_dict(),
+                    'appearance': self.embedding_appearance.state_dict()
+                    }, os.path.join(path, 'checkpoints.pth'))
+            elif self.appearance_dim > 0:
+                torch.save({
+                    'opacity_mlp': self.mlp_opacity.state_dict(),
+                    'cov_mlp': self.mlp_cov.state_dict(),
+                    'color_mlp': self.mlp_color.state_dict(),
+                    'appearance': self.embedding_appearance.state_dict()
+                    }, os.path.join(path, 'checkpoints.pth'))
+            else:
+                torch.save({
+                    'opacity_mlp': self.mlp_opacity.state_dict(),
+                    'cov_mlp': self.mlp_cov.state_dict(),
+                    'color_mlp': self.mlp_color.state_dict(),
+                    }, os.path.join(path, 'checkpoints.pth'))
         else:
-            torch.save({
-                'opacity_mlp': self.mlp_opacity.state_dict(),
-                'anchor_normals_mlp': self.mlp_anchor_normals.state_dict(),
-                'cov_mlp': self.mlp_cov.state_dict(),
-                'color_mlp': self.mlp_color.state_dict()}, path)
+            raise NotImplementedError
 
 
-    def load_mlp_checkpoints(self,path):
-        checkpoint = torch.load(path)
-        self.mlp_opacity.load_state_dict(checkpoint['opacity_mlp'])
-        # self.mlp_anchor_normals.load_state_dict(checkpoint['anchor_normals_mlp'])
-        self.mlp_cov.load_state_dict(checkpoint['cov_mlp'])
-        self.mlp_color.load_state_dict(checkpoint['color_mlp'])
-        if self.use_feat_bank:
-            self.mlp_feature_bank.load_state_dict(checkpoint['mlp_feature_bank'])
+    def load_mlp_checkpoints(self, path, mode = 'split'):#split or unite
+        if mode == 'split':
+            self.mlp_opacity = torch.jit.load(os.path.join(path, 'opacity_mlp.pt')).cuda()
+            self.mlp_cov = torch.jit.load(os.path.join(path, 'cov_mlp.pt')).cuda()
+            self.mlp_color = torch.jit.load(os.path.join(path, 'color_mlp.pt')).cuda()
+            if self.use_feat_bank:
+                self.mlp_feature_bank = torch.jit.load(os.path.join(path, 'feature_bank_mlp.pt')).cuda()
+            if self.appearance_dim > 0:
+                self.embedding_appearance = torch.jit.load(os.path.join(path, 'embedding_appearance.pt')).cuda()
+            if self.enable_idiv:
+                self.mlp_idiv = torch.jit.load(os.path.join(path, 'idiv_mlp.pt')).cuda()
+            # if HYBRID_IMP_2 and self.enable_idiv and self.ref:
+            #     self.mlp_mid_feature = torch.jit.load(os.path.join(path, 'mid_feature_mlp.pt')).cuda()
+            if self.ref:
+                self.mlp_tint = torch.jit.load(os.path.join(path, 'tint_mlp.pt')).cuda()
+                self.mlp_roughness = torch.jit.load(os.path.join(path, 'roughness_mlp.pt')).cuda()
+                self.mlp_specular = torch.jit.load(os.path.join(path, 'specular_mlp.pt')).cuda()
+        elif mode == 'unite':
+            checkpoint = torch.load(os.path.join(path, 'checkpoints.pth'))
+            self.mlp_opacity.load_state_dict(checkpoint['opacity_mlp'])
+            self.mlp_cov.load_state_dict(checkpoint['cov_mlp'])
+            self.mlp_color.load_state_dict(checkpoint['color_mlp'])
+            if self.use_feat_bank:
+                self.mlp_feature_bank.load_state_dict(checkpoint['feature_bank_mlp'])
+            if self.appearance_dim > 0:
+                self.embedding_appearance.load_state_dict(checkpoint['appearance'])
+        else:
+            raise NotImplementedError

@@ -10,11 +10,6 @@
 
 namespace isPowerOfTwo
 {
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wpadded"
-#endif
-
 	template<typename genType>
 	struct type
 	{
@@ -22,11 +17,7 @@ namespace isPowerOfTwo
 		bool		Return;
 	};
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
-	static int test_int16()
+	int test_int16()
 	{
 		type<glm::int16> const Data[] =
 		{
@@ -49,7 +40,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test_uint16()
+	int test_uint16()
 	{
 		type<glm::uint16> const Data[] =
 		{
@@ -72,7 +63,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test_int32()
+	int test_int32()
 	{
 		type<int> const Data[] =
 		{
@@ -95,7 +86,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test_uint32()
+	int test_uint32()
 	{
 		type<glm::uint> const Data[] =
 		{
@@ -118,7 +109,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -134,8 +125,7 @@ namespace isPowerOfTwo
 namespace nextPowerOfTwo_advanced
 {
 	template<typename genIUType>
-	GLM_FUNC_QUALIFIER
-	static genIUType highestBitValue(genIUType Value)
+	GLM_FUNC_QUALIFIER genIUType highestBitValue(genIUType Value)
 	{
 		genIUType tmp = Value;
 		genIUType result = genIUType(0);
@@ -148,8 +138,7 @@ namespace nextPowerOfTwo_advanced
 	}
 
 	template<typename genType>
-	GLM_FUNC_QUALIFIER
-	static genType nextPowerOfTwo_loop(genType value)
+	GLM_FUNC_QUALIFIER genType nextPowerOfTwo_loop(genType value)
 	{
 		return glm::isPowerOfTwo(value) ? value : highestBitValue(value) << 1;
 	}
@@ -161,7 +150,7 @@ namespace nextPowerOfTwo_advanced
 		genType		Return;
 	};
 
-	static int test_int32()
+	int test_int32()
 	{
 		type<glm::int32> const Data[] =
 		{
@@ -190,7 +179,7 @@ namespace nextPowerOfTwo_advanced
 		return Error;
 	}
 
-	static int test_uint32()
+	int test_uint32()
 	{
 		type<glm::uint32> const Data[] =
 		{
@@ -217,12 +206,12 @@ namespace nextPowerOfTwo_advanced
 		return Error;
 	}
 
-	static int perf()
+	int perf()
 	{
 		int Error(0);
 
 		std::vector<glm::uint> v;
-		v.resize(10000);
+		v.resize(100000000);
 
 		std::clock_t Timestramp0 = std::clock();
 
@@ -242,7 +231,7 @@ namespace nextPowerOfTwo_advanced
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -256,7 +245,7 @@ namespace nextPowerOfTwo_advanced
 namespace prevPowerOfTwo
 {
 	template <typename T>
-	static int run()
+	int run()
 	{
 		int Error = 0;
 
@@ -275,7 +264,7 @@ namespace prevPowerOfTwo
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -296,7 +285,7 @@ namespace prevPowerOfTwo
 namespace nextPowerOfTwo
 {
 	template <typename T>
-	static int run()
+	int run()
 	{
 		int Error = 0;
 
@@ -315,7 +304,7 @@ namespace nextPowerOfTwo
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -344,7 +333,7 @@ namespace prevMultiple
 	};
 
 	template <typename T>
-	static int run()
+	int run()
 	{
 		type<T> const Data[] =
 		{
@@ -363,7 +352,7 @@ namespace prevMultiple
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -385,7 +374,7 @@ namespace nextMultiple
 {
 	static glm::uint const Multiples = 128;
 
-	static int perf_nextMultiple(glm::uint Samples)
+	int perf_nextMultiple(glm::uint Samples)
 	{
 		std::vector<glm::uint> Results(Samples * Multiples);
 
@@ -409,14 +398,13 @@ namespace nextMultiple
 	}
 
 	template <typename T>
-	GLM_FUNC_QUALIFIER
-	static T nextMultipleMod(T Source, T Multiple)
+	GLM_FUNC_QUALIFIER T nextMultipleMod(T Source, T Multiple)
 	{
 		T const Tmp = Source - static_cast<T>(1);
 		return Tmp + (Multiple - (Tmp % Multiple));
 	}
 
-	static int perf_nextMultipleMod(glm::uint Samples)
+	int perf_nextMultipleMod(glm::uint Samples)
 	{
 		std::vector<glm::uint> Results(Samples * Multiples);
 
@@ -439,13 +427,8 @@ namespace nextMultiple
 		return Result > 0 ? 0 : 1;
 	}
 
-#if GLM_COMPILER & GLM_COMPILER_VC
-#	pragma warning(push)
-#	pragma warning(disable : 4146)
-#endif
 	template <typename T>
-	GLM_FUNC_QUALIFIER
-	static T nextMultipleNeg(T Source, T Multiple)
+	GLM_FUNC_QUALIFIER T nextMultipleNeg(T Source, T Multiple)
 	{
 		if(Source > static_cast<T>(0))
 		{
@@ -455,11 +438,8 @@ namespace nextMultiple
 		else
 			return Source + (-Source % Multiple);
 	}
-#if(GLM_COMPILER & GLM_COMPILER_VC)
-#	pragma warning(pop)
-#endif
 
-	static int perf_nextMultipleNeg(glm::uint Samples)
+	int perf_nextMultipleNeg(glm::uint Samples)
 	{
 		std::vector<glm::uint> Results(Samples * Multiples);
 
@@ -483,13 +463,12 @@ namespace nextMultiple
 	}
 
 	template <typename T>
-	GLM_FUNC_QUALIFIER
-	static T nextMultipleUFloat(T Source, T Multiple)
+	GLM_FUNC_QUALIFIER T nextMultipleUFloat(T Source, T Multiple)
 	{
 		return Source + (Multiple - std::fmod(Source, Multiple));
 	}
 
-	static int perf_nextMultipleUFloat(glm::uint Samples)
+	int perf_nextMultipleUFloat(glm::uint Samples)
 	{
 		std::vector<float> Results(Samples * Multiples);
 
@@ -513,8 +492,7 @@ namespace nextMultiple
 	}
 
 	template <typename T>
-	GLM_FUNC_QUALIFIER
-	static T nextMultipleFloat(T Source, T Multiple)
+	GLM_FUNC_QUALIFIER T nextMultipleFloat(T Source, T Multiple)
 	{
 		if(Source > static_cast<float>(0))
 			return Source + (Multiple - std::fmod(Source, Multiple));
@@ -522,7 +500,7 @@ namespace nextMultiple
 			return Source + std::fmod(-Source, Multiple);
 	}
 
-	static int perf_nextMultipleFloat(glm::uint Samples)
+	int perf_nextMultipleFloat(glm::uint Samples)
 	{
 		std::vector<float> Results(Samples * Multiples);
 
@@ -554,7 +532,7 @@ namespace nextMultiple
 	};
 
 	template <typename T>
-	static int test_uint()
+	int test_uint()
 	{
 		type<T> const Data[] =
 		{
@@ -582,11 +560,11 @@ namespace nextMultiple
 		return Error;
 	}
 
-	static int perf()
+	int perf()
 	{
 		int Error = 0;
 
-		glm::uint const Samples = 100;
+		glm::uint const Samples = 10000;
 
 		for(int i = 0; i < 4; ++i)
 		{
@@ -602,7 +580,7 @@ namespace nextMultiple
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -622,11 +600,6 @@ namespace nextMultiple
 
 namespace findNSB
 {
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wpadded"
-#endif
-
 	template<typename T>
 	struct type
 	{
@@ -635,12 +608,8 @@ namespace findNSB
 		int Return;
 	};
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
 	template <typename T>
-	static int run()
+	int run()
 	{
 		type<T> const Data[] =
 		{
@@ -668,7 +637,7 @@ namespace findNSB
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -699,8 +668,10 @@ int main()
 	Error += prevMultiple::test();
 	Error += nextMultiple::test();
 
-	Error += nextPowerOfTwo_advanced::perf();
-	Error += nextMultiple::perf();
+#	ifdef NDEBUG
+		Error += nextPowerOfTwo_advanced::perf();
+		Error += nextMultiple::perf();
+#	endif//NDEBUG
 
 	return Error;
 }

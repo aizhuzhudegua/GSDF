@@ -20,10 +20,12 @@
 #include "../ext/quaternion_exponential.hpp"
 #include "../gtx/norm.hpp"
 
-#ifndef GLM_ENABLE_EXPERIMENTAL
-#	error "GLM: GLM_GTX_quaternion is an experimental extension and may change in the future. Use #define GLM_ENABLE_EXPERIMENTAL before including it, if you really want to use it."
-#elif GLM_MESSAGES == GLM_ENABLE && !defined(GLM_EXT_INCLUDED)
-#	pragma message("GLM: GLM_GTX_quaternion extension included")
+#if GLM_MESSAGES == GLM_ENABLE && !defined(GLM_EXT_INCLUDED)
+#	ifndef GLM_ENABLE_EXPERIMENTAL
+#		pragma message("GLM: GLM_GTX_quaternion is an experimental extension and may change in the future. Use #define GLM_ENABLE_EXPERIMENTAL before including it, if you really want to use it.")
+#	else
+#		pragma message("GLM: GLM_GTX_quaternion extension included")
+#	endif
 #endif
 
 namespace glm
@@ -41,7 +43,7 @@ namespace glm
 	///
 	/// @see gtx_quaternion
 	template<typename T, qualifier Q>
-	GLM_FUNC_DECL GLM_CONSTEXPR vec<3, T, Q> cross(
+	GLM_FUNC_DECL vec<3, T, Q> cross(
 		qua<T, Q> const& q,
 		vec<3, T, Q> const& v);
 
@@ -49,7 +51,7 @@ namespace glm
 	///
 	/// @see gtx_quaternion
 	template<typename T, qualifier Q>
-	GLM_FUNC_DECL GLM_CONSTEXPR vec<3, T, Q> cross(
+	GLM_FUNC_DECL vec<3, T, Q> cross(
 		vec<3, T, Q> const& v,
 		qua<T, Q> const& q);
 

@@ -4,7 +4,7 @@
 #include <glm/gtc/epsilon.hpp>
 #include <glm/vector_relational.hpp>
 
-static int test_fastInverseSqrt()
+int test_fastInverseSqrt()
 {
 	int Error = 0;
 
@@ -17,7 +17,7 @@ static int test_fastInverseSqrt()
 	return Error;
 }
 
-static int test_fastDistance()
+int test_fastDistance()
 {
 	int Error = 0;
 

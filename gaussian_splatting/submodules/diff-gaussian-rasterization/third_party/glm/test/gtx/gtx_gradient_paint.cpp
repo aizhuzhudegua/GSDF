@@ -1,7 +1,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/gradient_paint.hpp>
 
-static int test_radialGradient()
+int test_radialGradient()
 {
 	int Error = 0;
 	
@@ -11,7 +11,7 @@ static int test_radialGradient()
 	return Error;
 }
 
-static int test_linearGradient()
+int test_linearGradient()
 {
 	int Error = 0;
 

@@ -5,8 +5,7 @@
 #include <cstdio>
 #include <vector>
 
-/*
-static void print_bits(float const& s)
+void print_bits(float const& s)
 {
 	union
 	{
@@ -25,7 +24,7 @@ static void print_bits(float const& s)
 	}
 }
 
-static void print_10bits(glm::uint const& s)
+void print_10bits(glm::uint const& s)
 {
 	std::printf("10b: ");
 	for(std::size_t j = 10; j > 0; --j)
@@ -36,7 +35,7 @@ static void print_10bits(glm::uint const& s)
 	}
 }
 
-static void print_11bits(glm::uint const& s)
+void print_11bits(glm::uint const& s)
 {
 	std::printf("11b: ");
 	for(std::size_t j = 11; j > 0; --j)
@@ -47,7 +46,7 @@ static void print_11bits(glm::uint const& s)
 	}
 }
 
-static void print_value(float const& s)
+void print_value(float const& s)
 {
 	std::printf("%2.5f, ", static_cast<double>(s));
 	print_bits(s);
@@ -57,8 +56,8 @@ static void print_value(float const& s)
 //	print_10bits(detail::floatTo10bit(s));
 	std::printf("\n");
 }
-*/
-static int test_Half1x16()
+
+int test_Half1x16()
 {
 	int Error = 0;
 
@@ -82,7 +81,7 @@ static int test_Half1x16()
 	return Error;
 }
 
-static int test_Half4x16()
+int test_Half4x16()
 {
 	int Error = 0;
 
@@ -110,7 +109,7 @@ static int test_Half4x16()
 	return Error;
 }
 
-static int test_I3x10_1x2()
+int test_I3x10_1x2()
 {
 	int Error = 0;
 
@@ -134,7 +133,7 @@ static int test_I3x10_1x2()
 	return Error;
 }
 
-static int test_U3x10_1x2()
+int test_U3x10_1x2()
 {
 	int Error = 0;
 
@@ -170,7 +169,7 @@ static int test_U3x10_1x2()
 	return Error;
 }
 
-static int test_Snorm3x10_1x2()
+int test_Snorm3x10_1x2()
 {
 	int Error = 0;
 
@@ -195,7 +194,7 @@ static int test_Snorm3x10_1x2()
 	return Error;
 }
 
-static int test_Unorm3x10_1x2()
+int test_Unorm3x10_1x2()
 {
 	int Error = 0;
 
@@ -220,7 +219,7 @@ static int test_Unorm3x10_1x2()
 	return Error;
 }
 
-static int test_F2x11_1x10()
+int test_F2x11_1x10()
 {
 	int Error = 0;
 
@@ -244,7 +243,7 @@ static int test_F2x11_1x10()
 	return Error;
 }
 
-static int test_F3x9_E1x5()
+int test_F3x9_E1x5()
 {
 	int Error = 0;
 
@@ -268,7 +267,7 @@ static int test_F3x9_E1x5()
 	return Error;
 }
 
-static int test_RGBM()
+int test_RGBM()
 {
 	int Error = 0;
 
@@ -284,7 +283,7 @@ static int test_RGBM()
 	return Error;
 }
 
-static int test_packUnorm1x16()
+int test_packUnorm1x16()
 {
 	int Error = 0;
 
@@ -306,7 +305,7 @@ static int test_packUnorm1x16()
 	return Error;
 }
 
-static int test_packSnorm1x16()
+int test_packSnorm1x16()
 {
 	int Error = 0;
 
@@ -327,7 +326,7 @@ static int test_packSnorm1x16()
 	return Error;
 }
 
-static int test_packUnorm2x16()
+int test_packUnorm2x16()
 {
 	int Error = 0;
 
@@ -348,7 +347,7 @@ static int test_packUnorm2x16()
 	return Error;
 }
 
-static int test_packSnorm2x16()
+int test_packSnorm2x16()
 {
 	int Error = 0;
 
@@ -369,7 +368,7 @@ static int test_packSnorm2x16()
 	return Error;
 }
 
-static int test_packUnorm4x16()
+int test_packUnorm4x16()
 {
 	int Error = 0;
 
@@ -391,7 +390,7 @@ static int test_packUnorm4x16()
 	return Error;
 }
 
-static int test_packSnorm4x16()
+int test_packSnorm4x16()
 {
 	int Error = 0;
 
@@ -412,7 +411,7 @@ static int test_packSnorm4x16()
 	return Error;
 }
 
-static int test_packUnorm1x8()
+int test_packUnorm1x8()
 {
 	int Error = 0;
 	
@@ -433,7 +432,7 @@ static int test_packUnorm1x8()
 	return Error;
 }
 
-static int test_packSnorm1x8()
+int test_packSnorm1x8()
 {
 	int Error = 0;
 	
@@ -453,7 +452,7 @@ static int test_packSnorm1x8()
 	return Error;
 }
 
-static int test_packUnorm2x8()
+int test_packUnorm2x8()
 {
 	int Error = 0;
 	
@@ -473,7 +472,7 @@ static int test_packUnorm2x8()
 	return Error;
 }
 
-static int test_packSnorm2x8()
+int test_packSnorm2x8()
 {
 	int Error = 0;
 	
@@ -492,7 +491,7 @@ static int test_packSnorm2x8()
 	return Error;
 }
 
-static int test_packUnorm4x8()
+int test_packUnorm4x8()
 {
 	int Error = 0;
 	
@@ -512,7 +511,7 @@ static int test_packUnorm4x8()
 	return Error;
 }
 
-static int test_packSnorm4x8()
+int test_packSnorm4x8()
 {
 	int Error = 0;
 	
@@ -532,7 +531,7 @@ static int test_packSnorm4x8()
 	return Error;
 }
 
-static int test_packUnorm()
+int test_packUnorm()
 {
 	int Error = 0;
 
@@ -552,7 +551,7 @@ static int test_packUnorm()
 	return Error;
 }
 
-static int test_packSnorm()
+int test_packSnorm()
 {
 	int Error = 0;
 
@@ -573,7 +572,7 @@ static int test_packSnorm()
 	return Error;
 }
 
-static int test_packUnorm2x4()
+int test_packUnorm2x4()
 {
 	int Error = 0;
 
@@ -593,7 +592,7 @@ static int test_packUnorm2x4()
 	return Error;
 }
 
-static int test_packUnorm4x4()
+int test_packUnorm4x4()
 {
 	int Error = 0;
 
@@ -613,7 +612,7 @@ static int test_packUnorm4x4()
 	return Error;
 }
 
-static int test_packUnorm3x5_1x1()
+int test_packUnorm3x5_1x1()
 {
 	int Error = 0;
 
@@ -633,7 +632,7 @@ static int test_packUnorm3x5_1x1()
 	return Error;
 }
 
-static int test_packUnorm1x5_1x6_1x5()
+int test_packUnorm1x5_1x6_1x5()
 {
 	int Error = 0;
 
@@ -653,7 +652,7 @@ static int test_packUnorm1x5_1x6_1x5()
 	return Error;
 }
 
-static int test_packUnorm2x3_1x2()
+int test_packUnorm2x3_1x2()
 {
 	int Error = 0;
 
@@ -673,7 +672,7 @@ static int test_packUnorm2x3_1x2()
 	return Error;
 }
 
-static int test_packUint2x8()
+int test_packUint2x8()
 {
 	int Error = 0;
 
@@ -688,7 +687,7 @@ static int test_packUint2x8()
 	return Error;
 }
 
-static int test_packUint4x8()
+int test_packUint4x8()
 {
 	int Error = 0;
 
@@ -703,7 +702,7 @@ static int test_packUint4x8()
 	return Error;
 }
 
-static int test_packUint2x16()
+int test_packUint2x16()
 {
 	int Error = 0;
 
@@ -718,7 +717,7 @@ static int test_packUint2x16()
 	return Error;
 }
 
-static int test_packUint4x16()
+int test_packUint4x16()
 {
 	int Error = 0;
 
@@ -733,7 +732,7 @@ static int test_packUint4x16()
 	return Error;
 }
 
-static int test_packUint2x32()
+int test_packUint2x32()
 {
 	int Error = 0;
 
@@ -748,7 +747,7 @@ static int test_packUint2x32()
 	return Error;
 }
 
-static int test_packInt2x8()
+int test_packInt2x8()
 {
 	int Error = 0;
 
@@ -763,7 +762,7 @@ static int test_packInt2x8()
 	return Error;
 }
 
-static int test_packInt4x8()
+int test_packInt4x8()
 {
 	int Error = 0;
 
@@ -778,7 +777,7 @@ static int test_packInt4x8()
 	return Error;
 }
 
-static int test_packInt2x16()
+int test_packInt2x16()
 {
 	int Error = 0;
 
@@ -793,7 +792,7 @@ static int test_packInt2x16()
 	return Error;
 }
 
-static int test_packInt4x16()
+int test_packInt4x16()
 {
 	int Error = 0;
 
@@ -808,7 +807,7 @@ static int test_packInt4x16()
 	return Error;
 }
 
-static int test_packInt2x32()
+int test_packInt2x32()
 {
 	int Error = 0;
 

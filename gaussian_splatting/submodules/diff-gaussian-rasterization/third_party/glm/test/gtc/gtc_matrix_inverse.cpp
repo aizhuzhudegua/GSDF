@@ -1,7 +1,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/epsilon.hpp>
 
-static int test_affine()
+int test_affine()
 {
 	int Error = 0;
 

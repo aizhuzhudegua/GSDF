@@ -13,7 +13,7 @@
 
 namespace test_eulerAngleX
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -56,7 +56,7 @@ namespace test_eulerAngleX
 
 namespace test_eulerAngleY
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -99,7 +99,7 @@ namespace test_eulerAngleY
 
 namespace test_eulerAngleZ
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -142,7 +142,7 @@ namespace test_eulerAngleZ
 
 namespace test_derivedEulerAngles
 {
-	static bool epsilonEqual(glm::mat4 const& mat1, glm::mat4 const& mat2, glm::mat4::value_type const& epsilon)
+	bool epsilonEqual(glm::mat4 const& mat1, glm::mat4 const& mat2, glm::mat4::value_type const& epsilon)
 	{
 		return glm::all(glm::epsilonEqual(mat1[0], mat2[0], epsilon)) ?
 				(
@@ -157,7 +157,7 @@ namespace test_derivedEulerAngles
 	}
 
 	template<typename RotationFunc, typename TestDerivedFunc>
-	static int test(RotationFunc rotationFunc, TestDerivedFunc testDerivedFunc, const glm::vec3& basis)
+	int test(RotationFunc rotationFunc, TestDerivedFunc testDerivedFunc, const glm::vec3& basis)
 	{
 		int Error = 0;
 
@@ -198,7 +198,7 @@ namespace test_derivedEulerAngles
 
 namespace test_eulerAngleXY
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -222,7 +222,7 @@ namespace test_eulerAngleXY
 
 namespace test_eulerAngleYX
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -246,7 +246,7 @@ namespace test_eulerAngleYX
 
 namespace test_eulerAngleXZ
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -270,7 +270,7 @@ namespace test_eulerAngleXZ
 
 namespace test_eulerAngleZX
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -294,7 +294,7 @@ namespace test_eulerAngleZX
 
 namespace test_eulerAngleYZ
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -303,6 +303,7 @@ namespace test_eulerAngleYZ
 		float const AngleY(glm::pi<float>() * 0.5f);
 		float const AngleZ(glm::pi<float>() * 0.25f);
 
+		glm::vec3 const axisX(1.0f, 0.0f, 0.0f);
 		glm::vec3 const axisY(0.0f, 1.0f, 0.0f);
 		glm::vec3 const axisZ(0.0f, 0.0f, 1.0f);
 
@@ -318,7 +319,7 @@ namespace test_eulerAngleYZ
 
 namespace test_eulerAngleZY
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -327,6 +328,7 @@ namespace test_eulerAngleZY
 		float const AngleY(glm::pi<float>() * 0.5f);
 		float const AngleZ(glm::pi<float>() * 0.25f);
 
+		glm::vec3 const axisX(1.0f, 0.0f, 0.0f);
 		glm::vec3 const axisY(0.0f, 1.0f, 0.0f);
 		glm::vec3 const axisZ(0.0f, 0.0f, 1.0f);
 
@@ -342,7 +344,7 @@ namespace test_eulerAngleZY
 
 namespace test_eulerAngleYXZ
 {
-	static int test()
+	int test()
 	{
 		glm::f32 first =  1.046f;
 		glm::f32 second = 0.52f;
@@ -371,7 +373,7 @@ namespace test_eulerAngleYXZ
 namespace test_eulerAngles
 {
 	template<typename TestRotationFunc>
-	static int test(TestRotationFunc testRotationFunc, glm::vec3 const& I, glm::vec3 const& J, glm::vec3 const& K)
+	int test(TestRotationFunc testRotationFunc, glm::vec3 const& I, glm::vec3 const& J, glm::vec3 const& K)
 	{
 		int Error = 0;
 
@@ -430,7 +432,7 @@ namespace test_eulerAngles
 namespace test_extractsEulerAngles
 {
 	template<typename RotationFunc, typename TestExtractionFunc>
-	static int test(RotationFunc rotationFunc, TestExtractionFunc testExtractionFunc)
+	int test(RotationFunc rotationFunc, TestExtractionFunc testExtractionFunc)
 	{
 		int Error = 0;
 

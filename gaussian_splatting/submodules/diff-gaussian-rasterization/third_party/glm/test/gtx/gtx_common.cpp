@@ -13,7 +13,7 @@ namespace fmod_
 		return a - b * glm::trunc(a / b);
 	}
 
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -104,7 +104,7 @@ namespace fmod_
 	}
 }//namespace fmod_
 
-static int test_isdenormal()
+int test_isdenormal()
 {
 	int Error = 0;
 
@@ -126,7 +126,7 @@ static int test_isdenormal()
 	return Error;
 }
 
-static int test_openBounded()
+int test_openBounded()
 {
 	int Error = 0;
 
@@ -137,7 +137,7 @@ static int test_openBounded()
 	return Error;
 }
 
-static int test_closeBounded()
+int test_closeBounded()
 {
 	int Error = 0;
 

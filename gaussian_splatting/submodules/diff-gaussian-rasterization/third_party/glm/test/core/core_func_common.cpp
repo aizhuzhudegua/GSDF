@@ -16,7 +16,6 @@
 
 // This file has divisions by zero to test isnan
 #if GLM_COMPILER & GLM_COMPILER_VC
-#	pragma warning(push)
 #	pragma warning(disable : 4723)
 #endif
 
@@ -298,12 +297,12 @@ namespace min_
 		return Error;
 	}
 
-	static int min_tern(int a, int b)
+	int min_tern(int a, int b)
 	{
 		return a < b ? a : b;
 	}
 
-	static int min_int(int x, int y)
+	int min_int(int x, int y)
 	{
 		return y ^ ((x ^ y) & -(x < y)); 
 	}
@@ -397,11 +396,6 @@ namespace clamp_
 
 namespace mix_
 {
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wpadded"
-#endif
-
 	template<typename T, typename B>
 	struct entry
 	{
@@ -411,16 +405,7 @@ namespace mix_
 		T Result;
 	};
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wglobal-constructors"
-#endif
-
-	static entry<float, bool> const TestBool[] =
+	entry<float, bool> const TestBool[] =
 	{
 		{0.0f, 1.0f, false, 0.0f},
 		{0.0f, 1.0f, true, 1.0f},
@@ -428,7 +413,7 @@ namespace mix_
 		{-1.0f, 1.0f, true, 1.0f}
 	};
 
-	static entry<float, float> const TestFloat[] =
+	entry<float, float> const TestFloat[] =
 	{
 		{0.0f, 1.0f, 0.0f, 0.0f},
 		{0.0f, 1.0f, 1.0f, 1.0f},
@@ -436,7 +421,7 @@ namespace mix_
 		{-1.0f, 1.0f, 1.0f, 1.0f}
 	};
 
-	static entry<glm::vec2, bool> const TestVec2Bool[] =
+	entry<glm::vec2, bool> const TestVec2Bool[] =
 	{
 		{glm::vec2(0.0f), glm::vec2(1.0f), false, glm::vec2(0.0f)},
 		{glm::vec2(0.0f), glm::vec2(1.0f), true, glm::vec2(1.0f)},
@@ -444,7 +429,7 @@ namespace mix_
 		{glm::vec2(-1.0f), glm::vec2(1.0f), true, glm::vec2(1.0f)}
 	};
 
-	static entry<glm::vec2, glm::bvec2> const TestBVec2[] =
+	entry<glm::vec2, glm::bvec2> const TestBVec2[] =
 	{
 		{glm::vec2(0.0f), glm::vec2(1.0f), glm::bvec2(false), glm::vec2(0.0f)},
 		{glm::vec2(0.0f), glm::vec2(1.0f), glm::bvec2(true), glm::vec2(1.0f)},
@@ -453,7 +438,7 @@ namespace mix_
 		{glm::vec2(-1.0f), glm::vec2(1.0f), glm::bvec2(true, false), glm::vec2(1.0f, -1.0f)}
 	};
 
-	static entry<glm::vec3, bool> const TestVec3Bool[] =
+	entry<glm::vec3, bool> const TestVec3Bool[] =
 	{
 		{glm::vec3(0.0f), glm::vec3(1.0f), false, glm::vec3(0.0f)},
 		{glm::vec3(0.0f), glm::vec3(1.0f), true, glm::vec3(1.0f)},
@@ -461,7 +446,7 @@ namespace mix_
 		{glm::vec3(-1.0f), glm::vec3(1.0f), true, glm::vec3(1.0f)}
 	};
 
-	static entry<glm::vec3, glm::bvec3> const TestBVec3[] =
+	entry<glm::vec3, glm::bvec3> const TestBVec3[] =
 	{
 		{glm::vec3(0.0f), glm::vec3(1.0f), glm::bvec3(false), glm::vec3(0.0f)},
 		{glm::vec3(0.0f), glm::vec3(1.0f), glm::bvec3(true), glm::vec3(1.0f)},
@@ -470,7 +455,7 @@ namespace mix_
 		{glm::vec3(1.0f, 2.0f, 3.0f), glm::vec3(4.0f, 5.0f, 6.0f), glm::bvec3(true, false, true), glm::vec3(4.0f, 2.0f, 6.0f)}
 	};
 
-	static entry<glm::vec4, bool> const TestVec4Bool[] =
+	entry<glm::vec4, bool> const TestVec4Bool[] = 
 	{
 		{glm::vec4(0.0f), glm::vec4(1.0f), false, glm::vec4(0.0f)},
 		{glm::vec4(0.0f), glm::vec4(1.0f), true, glm::vec4(1.0f)},
@@ -478,7 +463,7 @@ namespace mix_
 		{glm::vec4(-1.0f), glm::vec4(1.0f), true, glm::vec4(1.0f)}
 	};
 
-	static entry<glm::vec4, glm::bvec4> const TestBVec4[] =
+	entry<glm::vec4, glm::bvec4> const TestBVec4[] = 
 	{
 		{glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), glm::vec4(2.0f, 2.0f, 3.0f, 3.0f), glm::bvec4(false, true, false, true), glm::vec4(0.0f, 2.0f, 1.0f, 3.0f)},
 		{glm::vec4(0.0f), glm::vec4(1.0f), glm::bvec4(true), glm::vec4(1.0f)},
@@ -486,10 +471,6 @@ namespace mix_
 		{glm::vec4(-1.0f), glm::vec4(1.0f), glm::bvec4(true), glm::vec4(1.0f)},
 		{glm::vec4(1.0f, 2.0f, 3.0f, 4.0f), glm::vec4(5.0f, 6.0f, 7.0f, 8.0f), glm::bvec4(true, false, true, false), glm::vec4(5.0f, 2.0f, 7.0f, 4.0f)}
 	};
-
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
 
 	static int test()
 	{
@@ -593,29 +574,20 @@ namespace step_
 		VEC result;
 	};
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wglobal-constructors"
-#endif
-
-	static const entry<float, glm::vec4> TestVec4Scalar [] =
+	entry<float, glm::vec4> TestVec4Scalar [] =
 	{
 		{ 1.0f, glm::vec4(1.0f, 2.0f, 3.0f, 4.0f), glm::vec4(1.0f) },
 		{ 0.0f, glm::vec4(1.0f, 2.0f, 3.0f, 4.0f), glm::vec4(1.0f) },
 		{ 0.0f, glm::vec4(-1.0f, -2.0f, -3.0f, -4.0f), glm::vec4(0.0f) }
 	};
 
-	static const entry<glm::vec4, glm::vec4> TestVec4Vector [] =
+	entry<glm::vec4, glm::vec4> TestVec4Vector [] =
 	{
 		{ glm::vec4(-1.0f, -2.0f, -3.0f, -4.0f), glm::vec4(-2.0f, -3.0f, -4.0f, -5.0f), glm::vec4(0.0f) },
 		{ glm::vec4( 0.0f, 1.0f, 2.0f, 3.0f), glm::vec4( 1.0f, 2.0f, 3.0f, 4.0f), glm::vec4(1.0f) },
 		{ glm::vec4( 2.0f, 3.0f, 4.0f, 5.0f), glm::vec4( 1.0f, 2.0f, 3.0f, 4.0f), glm::vec4(0.0f) },
 		{ glm::vec4( 0.0f, 1.0f, 2.0f, 3.0f), glm::vec4(-1.0f,-2.0f,-3.0f,-4.0f), glm::vec4(0.0f) }
 	};
-
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
 
 	static int test()
 	{
@@ -656,42 +628,6 @@ namespace step_
 		return Error;
 	}
 }//namespace step_
-
-namespace smoothstep_
-{
-	static int test()
-	{
-		int Error = 0;
-
-		float const Edge = 2.0f;
-
-		// scalar
-		{
-			float const A = glm::smoothstep(0.0f, Edge, 1.0f);
-			Error += glm::equal(A, 0.5f, glm::epsilon<float>()) ? 0 : 1;
-
-			float const B = glm::smoothstep(0.0f, Edge, 1.0f);
-			Error += glm::equal(B, 0.5f, glm::epsilon<float>()) ? 0 : 1;
-
-			float const C = glm::smoothstep(0.0f, Edge, 1.0f);
-			Error += glm::equal(C, 0.5f, glm::epsilon<float>()) ? 0 : 1;
-		}
-
-		// vec4 and float
-		{
-			glm::vec4 Result = glm::smoothstep(0.0f, Edge, glm::vec4(1.0f));
-			Error += glm::all(glm::equal(Result, glm::vec4(0.5f), glm::epsilon<float>())) ? 0 : 1;
-		}
-
-		// vec4 and vec4
-		{
-			glm::vec4 Result = glm::smoothstep(glm::vec4(0.0f), glm::vec4(Edge), glm::vec4(1.0f));
-			Error += glm::all(glm::equal(Result, glm::vec4(0.5f), glm::epsilon<float>())) ? 0 : 1;
-		}
-
-		return Error;
-	}
-}//namespace smoothstep_
 
 namespace round_
 {
@@ -964,11 +900,6 @@ namespace sign
 		return result;
 	}
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wsign-conversion"
-#endif
-
 	template<typename genFIType> 
 	GLM_FUNC_QUALIFIER genFIType sign_alu1(genFIType x)
 	{
@@ -978,10 +909,6 @@ namespace sign
 
 		return (x >> 31) | (static_cast<unsigned>(-x) >> 31);
 	}
-
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
 
 	GLM_FUNC_QUALIFIER int sign_alu2(int x)
 	{
@@ -1026,7 +953,7 @@ namespace sign
 		genType		Return;
 	};
 
-	static int test_int32()
+	int test_int32()
 	{
 		type<glm::int32> const Data[] =
 		{
@@ -1076,7 +1003,7 @@ namespace sign
 		return Error;
 	}
 
-	static int test_i32vec4()
+	int test_i32vec4()
 	{
 		type<glm::ivec4> const Data[] =
 		{
@@ -1100,7 +1027,7 @@ namespace sign
 		return Error;
 	}
 
-	static int test_f32vec4()
+	int test_f32vec4()
 	{
 		type<glm::vec4> const Data[] =
 		{
@@ -1135,7 +1062,7 @@ namespace sign
 		return Error;
 	}
 
-	static int perf_rand(std::size_t Samples)
+	int perf_rand(std::size_t Samples)
 	{
 		int Error = 0;
 
@@ -1188,7 +1115,7 @@ namespace sign
 		return Error;
 	}
 
-	static int perf_linear(std::size_t Samples)
+	int perf_linear(std::size_t Samples)
 	{
 		int Error = 0;
 
@@ -1235,7 +1162,7 @@ namespace sign
 		return Error;
 	}
 
-	static int perf_linear_cal(std::size_t Samples)
+	int perf_linear_cal(std::size_t Samples)
 	{
 		int Error = 0;
 
@@ -1338,7 +1265,7 @@ namespace ldexp_
 {
 	static int test()
 	{
-		int Error = 0;
+		int Error(0);
 
 		{
 			glm::vec1 A = glm::vec1(0.5);
@@ -1380,11 +1307,6 @@ static int test_constexpr()
 	constexpr glm::vec2 const B = glm::abs(glm::vec2(1.0f));
 	constexpr glm::vec3 const C = glm::abs(glm::vec3(1.0f));
 	constexpr glm::vec4 const D = glm::abs(glm::vec4(1.0f));
-
-	static_assert(glm::all(glm::equal(A, glm::vec1(1.0f), glm::epsilon<float>())), "GLM: Failed constexpr");
-	static_assert(glm::all(glm::equal(B, glm::vec2(1.0f), glm::epsilon<float>())), "GLM: Failed constexpr");
-	static_assert(glm::all(glm::equal(C, glm::vec3(1.0f), glm::epsilon<float>())), "GLM: Failed constexpr");
-	static_assert(glm::all(glm::equal(D, glm::vec4(1.0f), glm::epsilon<float>())), "GLM: Failed constexpr");
 #endif // GLM_HAS_CONSTEXPR
 
 	return 0;
@@ -1403,7 +1325,6 @@ int main()
 	Error += floatBitsToUint::test();
 	Error += mix_::test();
 	Error += step_::test();
-	Error += smoothstep_::test();
 	Error += max_::test();
 	Error += min_::test();
 	Error += clamp_::test();
@@ -1426,6 +1347,3 @@ int main()
 	return Error;
 }
 
-#if(GLM_COMPILER & GLM_COMPILER_VC)
-#	pragma warning(pop)
-#endif

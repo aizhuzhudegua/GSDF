@@ -2,12 +2,7 @@
 #include <glm/gtx/type_aligned.hpp>
 #include <cstdio>
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wpadded"
-#endif
-
-static int test_decl()
+int test_decl()
 {
 	int Error(0);
 
@@ -34,20 +29,11 @@ static int test_decl()
 			glm::vec3 B;
 		};
 
-#		if GLM_COMPILER & GLM_COMPILER_VC
-#			pragma warning(push)
-#			pragma warning(disable : 4324)
-#		endif
-
 		struct S2
 		{
 			bool A;
 			glm::aligned_vec3 B;
 		};
-
-#		if GLM_COMPILER & GLM_COMPILER_VC
-#			pragma warning(pop)
-#		endif
 
 		std::printf("vec3 - Aligned: %d, unaligned: %d\n", static_cast<int>(sizeof(S1)), static_cast<int>(sizeof(S2)));
 
@@ -55,20 +41,11 @@ static int test_decl()
 	}
 
 	{
-#		if GLM_COMPILER & GLM_COMPILER_VC
-#			pragma warning(push)
-#			pragma warning(disable : 4324)
-#		endif
-
 		struct S1
 		{
 			bool A;
 			glm::aligned_vec4 B;
 		};
-
-#		if GLM_COMPILER & GLM_COMPILER_VC
-#			pragma warning(pop)
-#		endif
 
 		struct S2
 		{
@@ -82,20 +59,11 @@ static int test_decl()
 	}
 
 	{
-#		if GLM_COMPILER & GLM_COMPILER_VC
-#			pragma warning(push)
-#			pragma warning(disable : 4324)
-#		endif
-
 		struct S1
 		{
 			bool A;
 			glm::aligned_dvec4 B;
 		};
-
-#		if GLM_COMPILER & GLM_COMPILER_VC
-#			pragma warning(pop)
-#		endif
 
 		struct S2
 		{
@@ -112,7 +80,7 @@ static int test_decl()
 }
 
 template<typename genType>
-static void print(genType const& Mat0)
+void print(genType const& Mat0)
 {
 	std::printf("mat4(\n");
 	std::printf("\tvec4(%2.9f, %2.9f, %2.9f, %2.9f)\n", static_cast<double>(Mat0[0][0]), static_cast<double>(Mat0[0][1]), static_cast<double>(Mat0[0][2]), static_cast<double>(Mat0[0][3]));
@@ -121,7 +89,7 @@ static void print(genType const& Mat0)
 	std::printf("\tvec4(%2.9f, %2.9f, %2.9f, %2.9f))\n\n", static_cast<double>(Mat0[3][0]), static_cast<double>(Mat0[3][1]), static_cast<double>(Mat0[3][2]), static_cast<double>(Mat0[3][3]));
 }
 
-static int perf_mul()
+int perf_mul()
 {
 	int Error = 0;
 
@@ -134,10 +102,6 @@ static int perf_mul()
 
 	return Error;
 }
-
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
 
 int main()
 {

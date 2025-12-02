@@ -8,11 +8,6 @@
 
 namespace isPowerOfTwo
 {
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic push
-#	pragma clang diagnostic ignored "-Wpadded"
-#endif
-
 	template<typename genType>
 	struct type
 	{
@@ -20,11 +15,7 @@ namespace isPowerOfTwo
 		bool		Return;
 	};
 
-#if GLM_COMPILER & GLM_COMPILER_CLANG
-#	pragma clang diagnostic pop
-#endif
-
-	static int test_int16()
+	int test_int16()
 	{
 		type<glm::int16> const Data[] =
 		{
@@ -47,7 +38,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test_uint16()
+	int test_uint16()
 	{
 		type<glm::uint16> const Data[] =
 		{
@@ -70,7 +61,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test_int32()
+	int test_int32()
 	{
 		type<int> const Data[] =
 		{
@@ -117,7 +108,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test_uint32()
+	int test_uint32()
 	{
 		type<glm::uint> const Data[] =
 		{
@@ -140,7 +131,7 @@ namespace isPowerOfTwo
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -156,8 +147,7 @@ namespace isPowerOfTwo
 namespace ceilPowerOfTwo_advanced
 {
 	template<typename genIUType>
-	GLM_FUNC_QUALIFIER
-	static genIUType highestBitValue(genIUType Value)
+	GLM_FUNC_QUALIFIER genIUType highestBitValue(genIUType Value)
 	{
 		genIUType tmp = Value;
 		genIUType result = genIUType(0);
@@ -170,8 +160,7 @@ namespace ceilPowerOfTwo_advanced
 	}
 
 	template<typename genType>
-	GLM_FUNC_QUALIFIER
-	static genType ceilPowerOfTwo_loop(genType value)
+	GLM_FUNC_QUALIFIER genType ceilPowerOfTwo_loop(genType value)
 	{
 		return glm::isPowerOfTwo(value) ? value : highestBitValue(value) << 1;
 	}
@@ -183,7 +172,7 @@ namespace ceilPowerOfTwo_advanced
 		genType		Return;
 	};
 
-	static int test_int32()
+	int test_int32()
 	{
 		type<glm::int32> const Data[] =
 		{
@@ -212,7 +201,7 @@ namespace ceilPowerOfTwo_advanced
 		return Error;
 	}
 
-	static int test_uint32()
+	int test_uint32()
 	{
 		type<glm::uint32> const Data[] =
 		{
@@ -239,12 +228,12 @@ namespace ceilPowerOfTwo_advanced
 		return Error;
 	}
 
-	static int perf()
+	int perf()
 	{
 		int Error(0);
 
 		std::vector<glm::uint> v;
-		v.resize(10000);
+		v.resize(100000000);
 
 		std::clock_t Timestramp0 = std::clock();
 
@@ -264,7 +253,7 @@ namespace ceilPowerOfTwo_advanced
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -277,7 +266,7 @@ namespace ceilPowerOfTwo_advanced
 
 namespace roundPowerOfTwo
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 		
@@ -305,7 +294,7 @@ namespace roundPowerOfTwo
 
 namespace floorPowerOfTwo
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 		
@@ -324,7 +313,7 @@ namespace floorPowerOfTwo
 
 namespace ceilPowerOfTwo
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 		
@@ -352,7 +341,7 @@ namespace floorMultiple
 		genType		Epsilon;
 	};
 
-	static int test_float()
+	int test_float()
 	{
 		type<glm::float64> const Data[] = 
 		{
@@ -371,7 +360,7 @@ namespace floorMultiple
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -392,7 +381,7 @@ namespace ceilMultiple
 		genType		Epsilon;
 	};
 
-	static int test_float()
+	int test_float()
 	{
 		type<glm::float64> const Data[] = 
 		{
@@ -411,7 +400,7 @@ namespace ceilMultiple
 		return Error;
 	}
 
-	static int test_int()
+	int test_int()
 	{
 		type<int> const Data[] = 
 		{
@@ -437,7 +426,7 @@ namespace ceilMultiple
 		return Error;
 	}
 
-	static int test()
+	int test()
 	{
 		int Error(0);
 
@@ -458,7 +447,9 @@ int main()
 	Error += ceilPowerOfTwo::test();
 	Error += ceilPowerOfTwo_advanced::test();
 	
-	Error += ceilPowerOfTwo_advanced::perf();
+#	ifdef NDEBUG
+		Error += ceilPowerOfTwo_advanced::perf();
+#	endif//NDEBUG
 
 	Error += floorMultiple::test();
 	Error += ceilMultiple::test();

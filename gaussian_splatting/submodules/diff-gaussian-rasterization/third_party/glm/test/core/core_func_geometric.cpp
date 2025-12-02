@@ -13,7 +13,7 @@
 
 namespace length
 {
-	static int test()
+	int test()
 	{
 		float Length1 = glm::length(glm::vec1(1));
 		float Length2 = glm::length(glm::vec2(1, 0));
@@ -33,7 +33,7 @@ namespace length
 
 namespace distance
 {
-	static int test()
+	int test()
 	{
 		float Distance1 = glm::distance(glm::vec1(1), glm::vec1(1));
 		float Distance2 = glm::distance(glm::vec2(1, 0), glm::vec2(1, 0));
@@ -53,7 +53,7 @@ namespace distance
 
 namespace dot
 {
-	static int test()
+	int test()
 	{
 		float Dot1 = glm::dot(glm::vec1(1), glm::vec1(1));
 		float Dot2 = glm::dot(glm::vec2(1), glm::vec2(1));
@@ -73,7 +73,7 @@ namespace dot
 
 namespace cross
 {
-	static int test()
+	int test()
 	{
 		glm::vec3 Cross1 = glm::cross(glm::vec3(1, 0, 0), glm::vec3(0, 1, 0));
 		glm::vec3 Cross2 = glm::cross(glm::vec3(0, 1, 0), glm::vec3(1, 0, 0));
@@ -89,23 +89,22 @@ namespace cross
 
 namespace normalize
 {
-	static int test()
+	int test()
 	{
-		int Error = 0;
-
 		glm::vec3 Normalize1 = glm::normalize(glm::vec3(1, 0, 0));
 		glm::vec3 Normalize2 = glm::normalize(glm::vec3(2, 0, 0));
 
-		Error += glm::all(glm::lessThan(glm::abs(Normalize1 - glm::vec3(1, 0, 0)), glm::vec3(std::numeric_limits<float>::epsilon()))) ? 0 : 1;
-		Error += glm::all(glm::lessThan(glm::abs(Normalize2 - glm::vec3(1, 0, 0)), glm::vec3(std::numeric_limits<float>::epsilon()))) ? 0 : 1;
+		glm::vec3 Normalize3 = glm::normalize(glm::vec3(-0.6, 0.7, -0.5));
 
 		glm::vec3 ro = glm::vec3(glm::cos(5.f) * 3.f, 2.f, glm::sin(5.f) * 3.f);
 		glm::vec3 w = glm::normalize(glm::vec3(0, -0.2f, 0) - ro);
 		glm::vec3 u = glm::normalize(glm::cross(w, glm::vec3(0, 1, 0)));
 		glm::vec3 v = glm::cross(u, w);
-		glm::vec3 x = glm::cross(w, u);
 
-		Error += glm::all(glm::equal(x + v, glm::vec3(0), 0.01f)) ? 0 : 1;
+		int Error = 0;
+
+		Error += glm::all(glm::lessThan(glm::abs(Normalize1 - glm::vec3(1, 0, 0)), glm::vec3(std::numeric_limits<float>::epsilon()))) ? 0 : 1;
+		Error += glm::all(glm::lessThan(glm::abs(Normalize2 - glm::vec3(1, 0, 0)), glm::vec3(std::numeric_limits<float>::epsilon()))) ? 0 : 1;
 
 		return Error;
 	}
@@ -113,7 +112,7 @@ namespace normalize
 
 namespace faceforward
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -122,8 +121,6 @@ namespace faceforward
 			glm::vec3 I(1.0f, 0.0f, 1.0f);
 			glm::vec3 Nref(0.0f, 0.0f, 1.0f);
 			glm::vec3 F = glm::faceforward(N, I, Nref);
-
-			Error += glm::all(glm::equal(F, glm::vec3(0.0, 0.0, -1.0), 0.0001f)) ? 0 : 1;
 		}
 
 		return Error;
@@ -132,7 +129,7 @@ namespace faceforward
 
 namespace reflect
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -156,7 +153,7 @@ namespace reflect
 
 namespace refract
 {
-	static int test()
+	int test()
 	{
 		int Error = 0;
 
@@ -179,13 +176,6 @@ namespace refract
 			glm::dvec2 B(0.0f, 1.0f);
 			glm::dvec2 C = glm::refract(A, B, 0.5);
 			Error += glm::all(glm::equal(C, glm::dvec2(0.0, -1.0), 0.0001)) ? 0 : 1;
-		}
-
-		{
-			glm::vec4 A(0.0f, -1.0f, 0.0f, 0.0f);
-			glm::vec4 B(0.0f, 1.0f, 0.0f, 0.0f);
-			glm::vec4 C = glm::refract(A, B, 0.5f);
-			Error += glm::all(glm::equal(C, glm::vec4(0.0, -1.0, 0.0f, 0.0f), 0.0001f)) ? 0 : 1;
 		}
 
 		return Error;

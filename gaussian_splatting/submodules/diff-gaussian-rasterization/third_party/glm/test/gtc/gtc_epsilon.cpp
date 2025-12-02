@@ -3,35 +3,33 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/vector_relational.hpp>
 
-static int test_defined()
+int test_defined()
 {
-	int Error = 0;
+	glm::epsilonEqual(glm::vec2(), glm::vec2(), glm::vec2());
+	glm::epsilonEqual(glm::vec3(), glm::vec3(), glm::vec3());
+	glm::epsilonEqual(glm::vec4(), glm::vec4(), glm::vec4());
 
-	Error += glm::all(glm::epsilonEqual(glm::vec2(0.0f), glm::vec2(0.0f), glm::vec2(glm::epsilon<float>()))) ? 0 : 1;
-	Error += glm::all(glm::epsilonEqual(glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(glm::epsilon<float>()))) ? 0 : 1;
-	Error += glm::all(glm::epsilonEqual(glm::vec4(0.0f), glm::vec4(0.0f), glm::vec4(glm::epsilon<float>()))) ? 0 : 1;
-
-	Error += glm::all(glm::epsilonNotEqual(glm::vec2(1.0f), glm::vec2(2.0f), glm::vec2(glm::epsilon<float>()))) ? 0 : 1;
-	Error += glm::all(glm::epsilonNotEqual(glm::vec3(1.0f), glm::vec3(2.0f), glm::vec3(glm::epsilon<float>()))) ? 0 : 1;
-	Error += glm::all(glm::epsilonNotEqual(glm::vec4(1.0f), glm::vec4(2.0f), glm::vec4(glm::epsilon<float>()))) ? 0 : 1;
+	glm::epsilonNotEqual(glm::vec2(), glm::vec2(), glm::vec2());
+	glm::epsilonNotEqual(glm::vec3(), glm::vec3(), glm::vec3());
+	glm::epsilonNotEqual(glm::vec4(), glm::vec4(), glm::vec4());
 	
-	Error += glm::all(glm::epsilonEqual(glm::vec2(0.0f), glm::vec2(0.0f), glm::epsilon<float>())) ? 0 : 1;
-	Error += glm::all(glm::epsilonEqual(glm::vec3(0.0f), glm::vec3(0.0f), glm::epsilon<float>())) ? 0 : 1;
-	Error += glm::all(glm::epsilonEqual(glm::vec4(0.0f), glm::vec4(0.0f), glm::epsilon<float>())) ? 0 : 1;
-	Error += glm::all(glm::epsilonEqual(glm::quat(glm::vec3(0.0f)), glm::quat(glm::vec3(0.0f)), glm::epsilon<float>())) ? 0 : 1;
+	glm::epsilonEqual(glm::vec2(), glm::vec2(), 0.0f);
+	glm::epsilonEqual(glm::vec3(), glm::vec3(), 0.0f);
+	glm::epsilonEqual(glm::vec4(), glm::vec4(), 0.0f);
+	glm::epsilonEqual(glm::quat(), glm::quat(), 0.0f);
 
-	Error += glm::all(glm::epsilonNotEqual(glm::vec2(1.0f), glm::vec2(2.0f), glm::epsilon<float>())) ? 0 : 1;
-	Error += glm::all(glm::epsilonNotEqual(glm::vec3(1.0f), glm::vec3(2.0f), glm::epsilon<float>())) ? 0 : 1;
-	Error += glm::all(glm::epsilonNotEqual(glm::vec4(1.0f), glm::vec4(2.0f), glm::epsilon<float>())) ? 0 : 1;
-	Error += glm::all(glm::epsilonNotEqual(glm::quat(glm::vec3(0.0f)), glm::quat(glm::vec3(1.0f)), glm::epsilon<float>())) ? 0 : 1;
+	glm::epsilonNotEqual(glm::vec2(), glm::vec2(), 0.0f);
+	glm::epsilonNotEqual(glm::vec3(), glm::vec3(), 0.0f);
+	glm::epsilonNotEqual(glm::vec4(), glm::vec4(), 0.0f);
+	glm::epsilonNotEqual(glm::quat(), glm::quat(), 0.0f);
 
-	return Error;
+	return 0;
 }
 
 template<typename T>
-static int test_equal()
+int test_equal()
 {
-	int Error = 0;
+	int Error(0);
 	
 	{
 		T A = glm::epsilon<T>();
@@ -68,7 +66,7 @@ static int test_equal()
 
 int main()
 {
-	int Error = 0;
+	int Error(0);
 
 	Error += test_defined();
 	Error += test_equal<float>();
