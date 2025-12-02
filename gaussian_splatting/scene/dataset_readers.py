@@ -213,96 +213,59 @@ def normalize_scene(pcd,cam_infos_unsorted,inv_trans, scale):
     return normalized_pcd, norm_cam_infos_unsorted
 
 
-def readColmapSceneInfo(path, images, eval, lod, llffhold=8,scale_input=1.0,center_input=[0,0,0]):
-    try:
-        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
-        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
-        cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)
-        cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
-    except:
-        try:
-            cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.txt")
-            cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.txt")
-            cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
-            cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
-        except:
-            cameras_extrinsic_file = os.path.join(path, "colmap", "images.txt")
-            cameras_intrinsic_file = os.path.join(path, "colmap", "cameras.txt")
-            cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
-            cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
-    ply_path = os.path.join(path, "sparse/0/points3D.ply")
-    bin_path = os.path.join(path, "sparse/0/points3D.bin")
-    
-    txt_path = os.path.join(path, "sparse/0/points3D.txt")
-    if not os.path.exists(txt_path):
-        txt_path = os.path.join(path, "colmap/points3D.txt")
+def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
+    cam_infos = []
+    for idx, key in enumerate(cam_extrinsics):
+        sys.stdout.write('\r')
+        # the exact output you're looking for:
+        sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cam_extrinsics)))
+        sys.stdout.flush()
+
+        extr = cam_extrinsics[key]
+        intr = cam_intrinsics[extr.camera_id]
+        height = intr.height
+        width = intr.width
+
+        uid = intr.id
+        R = np.transpose(qvec2rotmat(extr.qvec))
+        T = np.array(extr.tvec)
+
+        # if intr.model=="SIMPLE_PINHOLE":
+        if intr.model=="SIMPLE_PINHOLE" or intr.model == "SIMPLE_RADIAL":
+            focal_length_x = intr.params[0]
+            FovY = focal2fov(focal_length_x, height)
+            FovX = focal2fov(focal_length_x, width)
+        elif intr.model=="PINHOLE":
+            focal_length_x = intr.params[0]
+            focal_length_y = intr.params[1]
+            FovY = focal2fov(focal_length_y, height)
+            FovX = focal2fov(focal_length_x, width)
+        else:
+            assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
         
-    if not os.path.exists(ply_path):
-        print("Converting point3d.bin to .ply, will happen only the first time you open the scene.")
-        try:
-            xyz, rgb, _ = read_points3D_binary(bin_path)
-        except:
-            xyz, rgb, _ = read_points3D_text(txt_path)
-            ply_path = os.path.join(path, "colmap/points3D.ply")
-        storePly(ply_path, xyz, rgb)
-    try:
-        pcd = fetchPly(ply_path)
-    except:
-        pcd = None
- 
-    
-    reading_dir = "images" if images == None else images
-    cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
-    #Normalize with given parameters or automatically
-    if scale_input!=0.0 or center_input!=[0,0,0]:
-        tc = torch.tensor(center_input).reshape(3, 1)
-        inv_trans = torch.cat([torch.cat([torch.eye(3), -tc], dim=1), torch.as_tensor([[0.,0.,0.,1.]])], dim=0)
-        scale = scale_input
-    else:
-        inv_trans, scale, tc = normalize_info(cam_extrinsics, pcd)
-        scale=1.0
+        # print(f'FovX: {FovX}, FovY: {FovY}')
 
-    
-    
-    pcd, cam_infos = normalize_scene(pcd,cam_infos_unsorted,inv_trans, scale)
-    
-    cam_infos = sorted(cam_infos.copy(), key = lambda x : x.image_name)
-  
-    
-    train_cam_infos = []
-    test_cam_infos = []
- 
-    if eval:
- 
-        for idx, c in enumerate(cam_infos):
-            if not os.path.exists(c.image_path):
-                continue
-            if idx % llffhold != 0:
-                train_cam_infos.append(c)
-              
-            else:
-                test_cam_infos.append(c)
+        image_path = os.path.join(images_folder, os.path.basename(extr.name))
+        image_name = os.path.basename(image_path).split(".")[0]
+        image = Image.open(image_path)
 
-               
+        # 原代码的法线读取逻辑（保留）
+        normal_image_path = os.path.join(images_folder, "normal", image_name + "_normal.png")
+        normal = None
+        if os.path.exists(normal_image_path):
+            normal_image = Image.open(normal_image_path)
+            normal_im_data = np.array(normal_image.convert("RGBA"))
+            bg = np.array([0, 0, 0])
+            norm_normal_data = normal_im_data / 255.0
+            normal = norm_normal_data[:,:,:3] * norm_normal_data[:, :, 3:4] + bg * (1 - norm_normal_data[:, :, 3:4])
 
-    else:
-        train_cam_infos = cam_infos
-        test_cam_infos = []
+        # print(f'image: {image.size}')
 
-
-
-    nerf_normalization = getNerfppNorm(train_cam_infos)
-
-    
-    
-
-
-    scene_info = SceneInfo(point_cloud=pcd,
-                           train_cameras=train_cam_infos,
-                           test_cameras=test_cam_infos,
-                           nerf_normalization=nerf_normalization,
-                           ply_path=ply_path,center=tc,scale=scale)
-    return scene_info
+        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                              image_path=image_path, image_name=image_name, width=width, height=height, normal=normal)
+        cam_infos.append(cam_info)
+    sys.stdout.write('\n')
+    return cam_infos
 
 
 
