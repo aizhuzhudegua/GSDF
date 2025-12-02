@@ -191,6 +191,36 @@ def storePly(path, xyz, rgb):
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
 
+def normalize_scene(pcd,cam_infos_unsorted,inv_trans, scale):
+    
+    pts = torch.from_numpy(pcd[0]).cuda()
+    
+    bb=torch.cat([pts, torch.ones_like(pts[:,0:1])], dim=-1)[...,None].cuda()
+  
+    pts = (inv_trans.cuda() @ bb)[:,:3,0]
+    pts = pts / scale
+    
+    
+    normalized_pcd = BasicPointCloud(points=pts.cpu().numpy(), colors=pcd[1], normals=pcd[2])
+    norm_cam_infos_unsorted = []
+    
+    for cam in cam_infos_unsorted:
+        W2C = getWorld2View2(cam.R, cam.T)
+        C2W = np.linalg.inv(W2C)
+        C2W_norm = (inv_trans @ C2W)
+        C2W_norm[...,3] /= scale
+        C2W_norm[3,3] = 1
+        # C2W_norm = (custom_inv_trans @ C2W_norm)
+        W2C_norm = np.linalg.inv(C2W_norm)
+        R_norm = W2C_norm[:3, :3].transpose()
+        t_norm = W2C_norm[:3, 3]
+        cam_info = CameraInfo(uid=cam[0], R=R_norm, T=t_norm, FovY=cam[3], FovX=cam[4], image=cam[5],
+                              image_path=cam[6], image_name=cam[7], width=cam[8], height=cam[9])
+        # print(cam[7])
+        norm_cam_infos_unsorted.append(cam_info)
+        
+    return normalized_pcd, norm_cam_infos_unsorted
+
 def readColmapSceneInfo(path, images, eval, lod, llffhold=8,scale_input=1.0,center_input=[0,0,0]):
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
