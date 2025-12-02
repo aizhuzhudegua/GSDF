@@ -12,6 +12,7 @@
 import os
 import glob
 import sys
+import torch
 from PIL import Image
 from tqdm import tqdm
 from typing import NamedTuple
@@ -52,6 +53,96 @@ class SceneInfo(NamedTuple):
     test_cameras: list
     nerf_normalization: dict
     ply_path: str
+    center: list  # 新增center属性
+    scale: float  # 新增scale属性
+
+def get_center(pts):
+    """辅助函数：计算点云的中心（去除异常值）"""
+    center = pts.mean(0)
+    dis = (pts - center[None,:]).norm(p=2, dim=-1)
+    mean, std = dis.mean(), dis.std()
+    q25, q75 = torch.quantile(dis, 0.25), torch.quantile(dis, 0.75)
+    valid = (dis > mean - 1.5 * std) & (dis < mean + 1.5 * std) & \
+            (dis > mean - (q75 - q25) * 1.5) & (dis < mean + (q75 - q25) * 1.5)
+    center = pts[valid].mean(0)
+    return center
+
+def normalize_info(cam_extrinsics, pcd):
+    """辅助函数：计算场景归一化的变换矩阵、缩放因子和中心"""
+    poses = []
+    pts = torch.from_numpy(pcd.points)  # BasicPointCloud的points属性
+    
+    # 读取所有相机的位姿
+    for idx, key in enumerate(cam_extrinsics):
+        extr = cam_extrinsics[key]
+        R = np.transpose(qvec2rotmat(extr.qvec))
+        T = np.array(extr.tvec)
+        W2C = getWorld2View2(R, T)
+        C2W = np.linalg.inv(W2C)
+        poses.append(torch.from_numpy(C2W).float())
+    poses = torch.stack(poses, dim=0)   
+
+    # 筛选前景点云（在相机包围盒内）
+    poses_min, poses_max = poses[...,3].min(0)[0], poses[...,3].max(0)[0]
+    pts_fg = pts[(poses_min[0] < pts[:,0]) & (pts[:,0] < poses_max[0]) & 
+                 (poses_min[1] < pts[:,1]) & (pts[:,1] < poses_max[1])]
+    
+    # 计算中心和缩放因子
+    center = get_center(pts_fg)
+    tc = center.reshape(3, 1)
+    t = -tc
+  
+    inv_trans = torch.cat([torch.cat([torch.eye(3), t], dim=1), 
+                           torch.as_tensor([[0.,0.,0.,1.]])], dim=0)
+    scale = (pts_fg - tc.T).norm(p=2, dim=-1).max()
+    return inv_trans, scale, tc
+
+def normalize_scene(pcd, cam_infos_unsorted, inv_trans, scale):
+    """辅助函数：对场景（点云和相机）进行归一化"""
+    # 归一化点云
+    pts = torch.from_numpy(pcd.points).cuda()
+    bb = torch.cat([pts, torch.ones_like(pts[:,0:1])], dim=-1)[...,None].cuda()
+    pts = (inv_trans.cuda() @ bb)[:,:3,0]
+    pts = pts / scale
+    
+    normalized_pcd = BasicPointCloud(
+        points=pts.cpu().numpy(), 
+        colors=pcd.colors, 
+        normals=pcd.normals
+    )
+    
+    # 归一化相机
+    norm_cam_infos_unsorted = []
+    for cam in cam_infos_unsorted:
+        W2C = getWorld2View2(cam.R, cam.T)
+        C2W = np.linalg.inv(W2C)
+        
+        # 应用归一化变换
+        C2W_norm = (inv_trans @ C2W)
+        C2W_norm[...,3] /= scale
+        C2W_norm[3,3] = 1
+        W2C_norm = np.linalg.inv(C2W_norm)
+        
+        # 更新相机参数
+        R_norm = W2C_norm[:3, :3].transpose()
+        t_norm = W2C_norm[:3, 3]
+        
+        cam_info = CameraInfo(
+            uid=cam.uid, 
+            R=R_norm, 
+            T=t_norm, 
+            FovY=cam.FovY, 
+            FovX=cam.FovX, 
+            image=cam.image,
+            image_path=cam.image_path, 
+            image_name=cam.image_name, 
+            width=cam.width, 
+            height=cam.height,
+            normal=cam.normal  # 保留法线信息
+        )
+        norm_cam_infos_unsorted.append(cam_info)
+        
+    return normalized_pcd, norm_cam_infos_unsorted
 
 def getNerfppNorm(cam_info):
     def get_center_and_diag(cam_centers):
@@ -80,7 +171,6 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     cam_infos = []
     for idx, key in enumerate(cam_extrinsics):
         sys.stdout.write('\r')
-        # the exact output you're looking for:
         sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cam_extrinsics)))
         sys.stdout.flush()
 
@@ -93,7 +183,6 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         R = np.transpose(qvec2rotmat(extr.qvec))
         T = np.array(extr.tvec)
 
-        # if intr.model=="SIMPLE_PINHOLE":
         if intr.model=="SIMPLE_PINHOLE" or intr.model == "SIMPLE_RADIAL":
             focal_length_x = intr.params[0]
             FovY = focal2fov(focal_length_x, height)
@@ -106,16 +195,38 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         else:
             assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
         
-        # print(f'FovX: {FovX}, FovY: {FovY}')
-
         image_path = os.path.join(images_folder, os.path.basename(extr.name))
         image_name = os.path.basename(image_path).split(".")[0]
-        image = Image.open(image_path)
+        
+        # 处理图像读取
+        if not os.path.exists(image_path):
+            image = None
+        else:
+            image = Image.open(image_path)
 
-        # print(f'image: {image.size}')
+        # 处理法线图像（如果存在）
+        normal_image_path = os.path.join(images_folder, "normal", image_name + "_normal.png")
+        normal = None
+        if os.path.exists(normal_image_path):
+            normal_image = Image.open(normal_image_path)
+            normal_im_data = np.array(normal_image.convert("RGBA"))
+            bg = np.array([0, 0, 0])
+            norm_normal_data = normal_im_data / 255.0
+            normal = norm_normal_data[:,:,:3] * norm_normal_data[:, :, 3:4] + bg * (1 - norm_normal_data[:, :, 3:4])
 
-        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                              image_path=image_path, image_name=image_name, width=width, height=height)
+        cam_info = CameraInfo(
+            uid=uid, 
+            R=R, 
+            T=T, 
+            FovY=FovY, 
+            FovX=FovX, 
+            image=image,
+            image_path=image_path, 
+            image_name=image_name, 
+            width=width, 
+            height=height,
+            normal=normal
+        )
         cam_infos.append(cam_info)
     sys.stdout.write('\n')
     return cam_infos
@@ -148,7 +259,8 @@ def storePly(path, xyz, rgb):
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
 
-def readColmapSceneInfo(path, images, eval, lod, llffhold=8):
+def readColmapSceneInfo(path, images, eval, lod, llffhold=8, scale_input=1.0, center_input=[0,0,0]):
+    """读取Colmap场景信息（支持scale_input和center_input参数）"""
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -161,30 +273,13 @@ def readColmapSceneInfo(path, images, eval, lod, llffhold=8):
         cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
 
     reading_dir = "images" if images == None else images
-    cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
-    cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
+    cam_infos_unsorted = readColmapCameras(
+        cam_extrinsics=cam_extrinsics, 
+        cam_intrinsics=cam_intrinsics, 
+        images_folder=os.path.join(path, reading_dir)
+    )
 
-    if eval:
-        if lod>0:
-            print(f'using lod, using eval')
-            if lod < 50:
-                train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx > lod]
-                test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx <= lod]
-                print(f'test_cam_infos: {len(test_cam_infos)}')
-            else:
-                train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx <= lod]
-                test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx > lod]
-
-        else:
-            train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
-            test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
-    
-    else:
-        train_cam_infos = cam_infos
-        test_cam_infos = []
-
-    nerf_normalization = getNerfppNorm(train_cam_infos)
-
+    # 处理点云
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
     bin_path = os.path.join(path, "sparse/0/points3D.bin")
     txt_path = os.path.join(path, "sparse/0/points3D.txt")
@@ -195,17 +290,55 @@ def readColmapSceneInfo(path, images, eval, lod, llffhold=8):
         except:
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
-    # try:
-    print(f'start fetching data from ply file')
     pcd = fetchPly(ply_path)
-    # except:
-    #     pcd = None
 
-    scene_info = SceneInfo(point_cloud=pcd,
-                           train_cameras=train_cam_infos,
-                           test_cameras=test_cam_infos,
-                           nerf_normalization=nerf_normalization,
-                           ply_path=ply_path)
+    # 根据传入参数处理归一化
+    if scale_input != 0.0 or center_input != [0,0,0]:
+        tc = torch.tensor(center_input).reshape(3, 1)
+        inv_trans = torch.cat([torch.cat([torch.eye(3), -tc], dim=1), 
+                               torch.as_tensor([[0.,0.,0.,1.]])], dim=0)
+        scale = scale_input
+    else:
+        inv_trans, scale, tc = normalize_info(cam_extrinsics, pcd)
+        scale = 1.0  # 默认不缩放
+
+    # 归一化点云和相机
+    pcd, cam_infos_unsorted = normalize_scene(pcd, cam_infos_unsorted, inv_trans, scale)
+
+    # 排序相机
+    cam_infos = sorted(cam_infos_unsorted.copy(), key=lambda x: x.image_name)
+
+    # 划分训练/测试集
+    if eval:
+        if lod > 0:
+            print(f'using lod, using eval')
+            if lod < 50:
+                train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx > lod]
+                test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx <= lod]
+                print(f'test_cam_infos: {len(test_cam_infos)}')
+            else:
+                train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx <= lod]
+                test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx > lod]
+        else:
+            train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+            test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+    else:
+        train_cam_infos = cam_infos
+        test_cam_infos = []
+
+    # 计算NeRF归一化参数
+    nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    # 返回包含center和scale的SceneInfo
+    scene_info = SceneInfo(
+        point_cloud=pcd,
+        train_cameras=train_cam_infos,
+        test_cameras=test_cam_infos,
+        nerf_normalization=nerf_normalization,
+        ply_path=ply_path,
+        center=tc.cpu().numpy().flatten().tolist(),  # 转为list
+        scale=scale.item()  # 转为float
+    )
     return scene_info
 
 def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png", is_debug=False, undistorted=False):
@@ -280,11 +413,13 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
                 image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
 
             normal_image_path = os.path.join(path, "normal", image_name + "_normal.png")
-            normal_image = Image.open(normal_image_path)
-            normal_im_data = np.array(normal_image.convert("RGBA"))
-            bg = np.array([0, 0, 0])
-            norm_normal_data = normal_im_data / 255.0
-            normal_arr = norm_normal_data[:,:,:3] * norm_normal_data[:, :, 3:4] + bg * (1 - norm_normal_data[:, :, 3:4])
+            normal_image = Image.open(normal_image_path) if os.path.exists(normal_image_path) else None
+            normal = None
+            if normal_image:
+                normal_im_data = np.array(normal_image.convert("RGBA"))
+                bg = np.array([0, 0, 0])
+                norm_normal_data = normal_im_data / 255.0
+                normal = norm_normal_data[:,:,:3] * norm_normal_data[:, :, 3:4] + bg * (1 - norm_normal_data[:, :, 3:4])
 
             if fovx is not None:
                 fovy = focal2fov(fov2focal(fovx, image.size[0]), image.size[1])
@@ -296,7 +431,7 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
                 FovX = focal2fov(frame["fl_x"], image.size[0])
 
             cam_infos.append(CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                            image_path=image_path, image_name=image_name, width=image.size[0], height=image.size[1], normal=normal_arr))
+                            image_path=image_path, image_name=image_name, width=image.size[0], height=image.size[1], normal=normal))
             
             if is_debug and idx > 50:
                 break
@@ -331,11 +466,16 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png", ply_pa
     except:
         pcd = None
 
-    scene_info = SceneInfo(point_cloud=pcd,
-                           train_cameras=train_cam_infos,
-                           test_cameras=test_cam_infos,
-                           nerf_normalization=nerf_normalization,
-                           ply_path=ply_path)
+    # 为Blender场景添加默认的center和scale
+    scene_info = SceneInfo(
+        point_cloud=pcd,
+        train_cameras=train_cam_infos,
+        test_cameras=test_cam_infos,
+        nerf_normalization=nerf_normalization,
+        ply_path=ply_path,
+        center=[0,0,0],  # 默认中心
+        scale=1.0        # 默认缩放
+    )
     return scene_info
 
 sceneLoadTypeCallbacks = {
