@@ -13,17 +13,17 @@ import torch
 from functools import reduce
 import numpy as np
 from torch_scatter import scatter_max
-from utils.general_utils import inverse_sigmoid, get_expon_lr_func
+from gaussian_splatting.utils.general_utils import inverse_sigmoid, get_expon_lr_func
 from torch import nn
 import os
 from torch.utils.cpp_extension import load
-from utils.system_utils import mkdir_p
+from gaussian_splatting.utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from simple_knn._C import distCUDA2
-from utils.graphics_utils import BasicPointCloud
-from utils.general_utils import strip_symmetric, build_scaling_rotation
-from utils.ref_utils import generate_ide_fn
-from scene.embedding import Embedding
+from gaussian_splatting.utils.graphics_utils import BasicPointCloud
+from gaussian_splatting.utils.general_utils import strip_symmetric, build_scaling_rotation
+from gaussian_splatting.utils.ref_utils import generate_ide_fn
+from gaussian_splatting.scene.embedding import Embedding
 
 TINT_ROUGH_SEP = True
 HYBRID_IMP_2 = False

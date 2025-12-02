@@ -16,9 +16,9 @@ from PIL import Image
 from tqdm import tqdm
 from typing import NamedTuple
 from colorama import Fore, init, Style
-from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
+from gaussian_splatting.scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
     read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
-from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
+from gaussian_splatting.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
 import json
 from pathlib import Path
@@ -27,8 +27,8 @@ try:
     import laspy
 except:
     print("No laspy")
-from utils.sh_utils import SH2RGB
-from scene.gaussian_model import BasicPointCloud
+from gaussian_splatting.utils.sh_utils import SH2RGB
+from gaussian_splatting.scene.gaussian_model import BasicPointCloud
 import cv2
 
 
