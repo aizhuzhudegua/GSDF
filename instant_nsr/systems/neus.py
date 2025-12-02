@@ -202,7 +202,9 @@ class NeuSSystem(BaseSystem):
             self.lp = lp.extract(args)
             self.saving_iterations = args.save_iterations
             self.testing_iterations = args.test_iterations
-            self.gaussians = GaussianModel(self.lp.feat_dim, self.lp.n_offsets, self.lp.voxel_size, self.lp.update_depth, self.lp.update_init_factor, self.lp.update_hierachy_factor, self.lp.use_feat_bank, self.lp.use_tcnn)
+            self.gaussians =  GaussianModel(self.lp.feat_dim, self.lp.n_offsets, self.lp.voxel_size, self.lp.update_depth, self.lp.update_init_factor, self.lp.update_hierachy_factor, self.lp.use_feat_bank, 
+                              self.lp.appearance_dim, self.lp.ratio, self.lp.add_opacity_dist, self.lp.add_cov_dist, self.lp.add_color_dist, self.lp.idiv, self.lp.ref,
+                              self.lp.enable_idiv_iter, self.lp.enable_ref_iter, self.lp.deg_view)
             self.ema_loss_for_log = 0.0
             self.dataset_size=0
             self.last_iteration_time=0
