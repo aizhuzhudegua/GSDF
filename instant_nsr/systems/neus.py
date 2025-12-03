@@ -75,8 +75,7 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
                 for idx, viewpoint in enumerate(config['cameras']):
                     voxel_visible_mask = gaussian_renderer.prefilter_voxel(viewpoint, scene.gaussians, *renderArgs)
                     
-                    bg_color = [1, 1, 1]
-                    background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+                    
                     render_pkg = renderFunc(viewpoint, scene.gaussians, *renderArgs, visible_mask=voxel_visible_mask, retain_grad=False,
                             render_n=True, render_dotprod=True, render_full=True)
                     image = torch.clamp(render_pkg["render"], 0.0, 1.0)
@@ -331,6 +330,7 @@ class NeuSSystem(BaseSystem):
 
             time2=time.time()
 
+            
             # render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, self.background, visible_mask=voxel_visible_mask, retain_grad=retain_grad)
             render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, random_background, visible_mask=voxel_visible_mask, retain_grad=retain_grad)
 
@@ -425,7 +425,9 @@ class NeuSSystem(BaseSystem):
             voxel_visible_mask = gaussian_renderer.prefilter_voxel(viewpoint_cam, self.gaussians, self.piplin, random_background)
 
             retain_grad = (current_epoch_gs < self.op.update_until and current_epoch_gs >= 0)
-            render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, random_background, visible_mask=voxel_visible_mask, retain_grad=retain_grad, out_depth=True, return_normal=True, radius=self.config.model.radius)
+            
+            render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians,  self.piplin, random_background, visible_mask=voxel_visible_mask, retain_grad=retain_grad,
+                            render_n=True, render_dotprod=True, render_full=True)
 
             # render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, self.background, visible_mask=voxel_visible_mask, retain_grad=retain_grad, out_depth=True, return_normal=True, radius=self.config.model.radius)
             image, viewspace_point_tensor, visibility_filter, offset_selection_mask, radii, scaling, opacity_gs, gs_depth,normal = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["selection_mask"], render_pkg["radii"], render_pkg["scaling"], render_pkg["neural_opacity"], render_pkg["depth"], render_pkg["normal"]
