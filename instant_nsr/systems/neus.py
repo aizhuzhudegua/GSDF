@@ -77,7 +77,7 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
                     
                     bg_color = [1, 1, 1]
                     background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
-                    render_pkg = renderFunc(viewpoint, scene.gaussians, *renderArgs, background, visible_mask=voxel_visible_mask, retain_grad=False,
+                    render_pkg = renderFunc(viewpoint, scene.gaussians, *renderArgs, visible_mask=voxel_visible_mask, retain_grad=False,
                             render_n=True, render_dotprod=True, render_full=True)
                     image = torch.clamp(render_pkg["render"], 0.0, 1.0)
                     depth_gs = render_pkg["depth"]
