@@ -1042,20 +1042,20 @@ class GaussianModel:
                     'color_mlp': self.mlp_color.state_dict(),
                     'feature_bank_mlp': self.mlp_feature_bank.state_dict(),
                     'appearance': self.embedding_appearance.state_dict()
-                    }, os.path.join(path, 'checkpoints.pth'))
+                    }, os.path.join(path))
             elif self.appearance_dim > 0:
                 torch.save({
                     'opacity_mlp': self.mlp_opacity.state_dict(),
                     'cov_mlp': self.mlp_cov.state_dict(),
                     'color_mlp': self.mlp_color.state_dict(),
                     'appearance': self.embedding_appearance.state_dict()
-                    }, os.path.join(path, 'checkpoints.pth'))
+                    }, os.path.join(path))
             else:
                 torch.save({
                     'opacity_mlp': self.mlp_opacity.state_dict(),
                     'cov_mlp': self.mlp_cov.state_dict(),
                     'color_mlp': self.mlp_color.state_dict(),
-                    }, os.path.join(path, 'checkpoints.pth'))
+                    }, os.path.join(path))
         else:
             raise NotImplementedError
 
@@ -1078,7 +1078,7 @@ class GaussianModel:
                 self.mlp_roughness = torch.jit.load(os.path.join(path, 'roughness_mlp.pt')).cuda()
                 self.mlp_specular = torch.jit.load(os.path.join(path, 'specular_mlp.pt')).cuda()
         elif mode == 'unite':
-            checkpoint = torch.load(os.path.join(path, 'checkpoints.pth'))
+            checkpoint = torch.load(os.path.join(path))
             self.mlp_opacity.load_state_dict(checkpoint['opacity_mlp'])
             self.mlp_cov.load_state_dict(checkpoint['cov_mlp'])
             self.mlp_color.load_state_dict(checkpoint['color_mlp'])
