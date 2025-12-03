@@ -1060,7 +1060,7 @@ class GaussianModel:
             raise NotImplementedError
 
 
-    def load_mlp_checkpoints(self, path, mode = 'split'):#split or unite
+    def load_mlp_checkpoints(self, path, mode = 'unite'):#split or unite
         if mode == 'split':
             self.mlp_opacity = torch.jit.load(os.path.join(path, 'opacity_mlp.pt')).cuda()
             self.mlp_cov = torch.jit.load(os.path.join(path, 'cov_mlp.pt')).cuda()
