@@ -972,7 +972,7 @@ class GaussianModel:
         
         self.max_radii2D = torch.zeros((self.get_anchor.shape[0]), device="cuda")
 
-    def save_mlp_checkpoints(self, path, mode = 'split'):#split or unite
+    def save_mlp_checkpoints(self, path, mode = 'unite'):#split or unite
         mkdir_p(os.path.dirname(path))
         if mode == 'split':
             self.mlp_opacity.eval()
