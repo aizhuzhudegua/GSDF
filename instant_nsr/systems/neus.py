@@ -858,7 +858,7 @@ class NeuSSystem(BaseSystem):
         # Create Tensorboard writer
         tb_writer = None
         if TENSORBOARD_FOUND:
-            tb_writer = SummaryWriter(args.model_path)
+            tb_writer = SummaryWriter("/tf_logs/")
         else:
             print("Tensorboard not available: not logging progress")
         return tb_writer
