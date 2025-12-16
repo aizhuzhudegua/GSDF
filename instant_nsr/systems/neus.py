@@ -38,6 +38,8 @@ from os import makedirs
 from PIL import Image
 import torchvision.transforms.functional as tf
 from instant_nsr.systems import register
+from gaussian_splatting.utils.graphics_utils import normalize_rendered_by_weights, render_normal_from_depth
+from gaussian_splatting.utils.loss_utils import predicted_normal_loss, total_variation, cross_entropy_loss
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -315,6 +317,8 @@ class NeuSSystem(BaseSystem):
             iter_start = torch.cuda.Event(enable_timing = True)
             iter_end = torch.cuda.Event(enable_timing = True)
             iter_start.record()
+
+            self.gaussians.update_render_status(iteration)
             self.gaussians.update_learning_rate(iteration)
 
             if not self.viewpoint_stack:
@@ -332,7 +336,8 @@ class NeuSSystem(BaseSystem):
 
             
             # render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, self.background, visible_mask=voxel_visible_mask, retain_grad=retain_grad)
-            render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, random_background, visible_mask=voxel_visible_mask, retain_grad=retain_grad)
+            render_pkg = gaussian_renderer.render(viewpoint_cam, self.gaussians, self.piplin, random_background, visible_mask=voxel_visible_mask, retain_grad=retain_grad
+                                                  ,render_n=True, render_dotprod=True, render_full=True)
 
             image, viewspace_point_tensor, visibility_filter, offset_selection_mask, radii, scaling, opacity = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["selection_mask"], render_pkg["radii"], render_pkg["scaling"], render_pkg["neural_opacity"]
             time3=time.time()
@@ -343,6 +348,53 @@ class NeuSSystem(BaseSystem):
                 Ll1 = l1_loss(image, gt_image)
                 scaling_reg = scaling.prod(dim=1).mean()
                 loss_gaussian= (1.0 - self.op.lambda_dssim) * Ll1 + self.op.lambda_dssim * (1.0 - ssim(image, gt_image)) + 0.01*scaling_reg
+
+                
+                reg_back_normal = (self.op.back_normal_start != -1) and (iteration > self.op.back_normal_start) and (iteration < self.op.back_normal_end) and (self.gaussians.ref)
+                reg_pred_normal = (self.op.depth_normal_start != -1) and (iteration > self.op.depth_normal_start) and (iteration < self.op.depth_normal_end)
+                reg_tv = (self.op.tv_start != -1) and (iteration > self.op.tv_start) and (iteration < self.op.tv_end) and (self.op.tv_normal)
+                reg_opacity = (self.op.reg_opacity_start != -1) and (iteration > self.op.reg_opacity_start) and (iteration < self.op.reg_opacity_end)
+
+                # Add Extra Loss
+                if reg_pred_normal or reg_tv:
+                    alpha = render_pkg["alpha"].detach()[0] # H, W
+                    # alpha = render_pkg["alpha"][0] # H, W
+                    normal = render_pkg["normal"]
+                    depth = render_pkg["depth"][0] # view space
+                    surface_mask = alpha > self.op.omit_opacity_threshold # H, W
+                    # if iteration > 15000 and opt.use_normalized_attributes:
+                if True:
+                    normal = normalize_rendered_by_weights(normal, alpha, self.op.omit_opacity_threshold)
+                    # depth = normalize_rendered_by_weights(depth, alpha, opt.omit_opacity_threshold)
+                losses_extra = {}
+                if reg_back_normal:
+                    dotprod_img = render_pkg["dotprod"]
+                    losses_extra["back_normal"] = dotprod_img.mean()
+                if reg_pred_normal:
+                    # lambda_decay = pred_normal_smooth(iteration - opt.depth_normal_start)
+                    # if (iteration % 1000 == 0):
+                    #     print("\n", lambda_decay)
+                    if self.opopt.use_normalized_attributes:
+                        normal_from_depth = render_normal_from_depth(viewpoint_cam, depth)
+                        losses_extra['depth_normal'] = predicted_normal_loss(normal, normal_from_depth, surface_mask, threshold=self.op.omit_opacity_threshold)
+                    else:
+                        normal_from_depth = render_normal_from_depth(viewpoint_cam, depth) * alpha
+                        losses_extra['depth_normal'] = predicted_normal_loss(normal, normal_from_depth, surface_mask, threshold=self.op.omit_opacity_threshold)
+                if reg_tv:
+                    losses_extra["tv"] = 0.0
+                    if self.opopt.tv_normal:
+                        losses_extra["tv"] += total_variation(normal, surface_mask)
+                        # surface_mask_ = surface_mask[None, ...].repeat(3, 1, 1)
+                        # curv_n = normal2curv(normal, surface_mask_)
+                        # losses_extra["tv"] += l1_loss(curv_n * 1, 0)
+
+                if reg_opacity:
+                    opacity_mask = torch.gt(opacity, 0.01) * torch.le(opacity, 0.99)
+                    losses_extra['reg_opacity'] = cross_entropy_loss(opacity * opacity_mask)
+
+                for k in losses_extra.keys():
+                    loss += getattr(self.opopt, f'lambda_{k}')* losses_extra[k]
+
                 loss_gaussian.backward()
 
                 time4=time.time()
