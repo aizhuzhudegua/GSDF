@@ -467,6 +467,8 @@ class NeuSSystem(BaseSystem):
             iter_start = torch.cuda.Event(enable_timing = True)
             iter_end = torch.cuda.Event(enable_timing = True)
             iter_start.record()
+
+            self.gaussians.update_render_status(current_epoch_gs)
             self.gaussians.update_learning_rate(current_epoch_gs)
 
             # Get the same image index as Instant-nsr
