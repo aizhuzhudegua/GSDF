@@ -379,7 +379,7 @@ class NeuSSystem(BaseSystem):
                     # lambda_decay = pred_normal_smooth(iteration - opt.depth_normal_start)
                     # if (iteration % 1000 == 0):
                     #     print("\n", lambda_decay)
-                    if self.opopt.use_normalized_attributes:
+                    if self.op.use_normalized_attributes:
                         normal_from_depth = render_normal_from_depth(viewpoint_cam, depth)
                         losses_extra['depth_normal'] = predicted_normal_loss(normal, normal_from_depth, surface_mask, threshold=self.op.omit_opacity_threshold)
                     else:
@@ -387,7 +387,7 @@ class NeuSSystem(BaseSystem):
                         losses_extra['depth_normal'] = predicted_normal_loss(normal, normal_from_depth, surface_mask, threshold=self.op.omit_opacity_threshold)
                 if reg_tv:
                     losses_extra["tv"] = 0.0
-                    if self.opopt.tv_normal:
+                    if self.op.tv_normal:
                         losses_extra["tv"] += total_variation(normal, surface_mask)
                         # surface_mask_ = surface_mask[None, ...].repeat(3, 1, 1)
                         # curv_n = normal2curv(normal, surface_mask_)
@@ -398,7 +398,7 @@ class NeuSSystem(BaseSystem):
                     losses_extra['reg_opacity'] = cross_entropy_loss(opacity * opacity_mask)
 
                 for k in losses_extra.keys():
-                    loss_gaussian += getattr(self.opopt, f'lambda_{k}')* losses_extra[k]
+                    loss_gaussian += getattr(self.op, f'lambda_{k}')* losses_extra[k]
 
                 loss_gaussian.backward()
 
