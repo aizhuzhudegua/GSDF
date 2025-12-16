@@ -349,6 +349,10 @@ class NeuSSystem(BaseSystem):
                 scaling_reg = scaling.prod(dim=1).mean()
                 loss_gaussian= (1.0 - self.op.lambda_dssim) * Ll1 + self.op.lambda_dssim * (1.0 - ssim(image, gt_image)) + 0.01*scaling_reg
 
+                if self.op.plate:
+                    sorted_scale, _ = torch.sort(scaling, dim=-1)
+                    min_scale_loss = sorted_scale[...,0]
+                    loss_gaussian += 100.0*min_scale_loss.mean()
                 
                 reg_back_normal = (self.op.back_normal_start != -1) and (iteration > self.op.back_normal_start) and (iteration < self.op.back_normal_end) and (self.gaussians.ref)
                 reg_pred_normal = (self.op.depth_normal_start != -1) and (iteration > self.op.depth_normal_start) and (iteration < self.op.depth_normal_end)
@@ -363,9 +367,10 @@ class NeuSSystem(BaseSystem):
                     depth = render_pkg["depth"][0] # view space
                     surface_mask = alpha > self.op.omit_opacity_threshold # H, W
                     # if iteration > 15000 and opt.use_normalized_attributes:
-                if True:
-                    normal = normalize_rendered_by_weights(normal, alpha, self.op.omit_opacity_threshold)
-                    # depth = normalize_rendered_by_weights(depth, alpha, opt.omit_opacity_threshold)
+                    if self.op.use_normalized_attributes:
+                        normal = normalize_rendered_by_weights(normal, alpha, self.op.omit_opacity_threshold)
+                        # depth = normalize_rendered_by_weights(depth, alpha, opt.omit_opacity_threshold)
+                
                 losses_extra = {}
                 if reg_back_normal:
                     dotprod_img = render_pkg["dotprod"]
@@ -393,7 +398,7 @@ class NeuSSystem(BaseSystem):
                     losses_extra['reg_opacity'] = cross_entropy_loss(opacity * opacity_mask)
 
                 for k in losses_extra.keys():
-                    loss += getattr(self.opopt, f'lambda_{k}')* losses_extra[k]
+                    loss_gaussian += getattr(self.opopt, f'lambda_{k}')* losses_extra[k]
 
                 loss_gaussian.backward()
 
