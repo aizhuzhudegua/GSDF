@@ -167,7 +167,7 @@ class OptimizationParams(ParamGroup):
         self.start_stat = 500
         self.update_from = 1500
         self.update_interval = 100
-        self.update_until = 15_000
+        self.update_until = 30000 #self.iterations - 15_000
         
         self.min_opacity = 0.005
         self.success_threshold = 0.8
