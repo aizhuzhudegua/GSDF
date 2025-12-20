@@ -710,8 +710,16 @@ class GaussianModel:
         return optimizable_tensors
 
 
-    # statis grad information to guide liftting. 
-    def training_statis(self, viewspace_point_tensor, opacity, update_filter, offset_selection_mask, anchor_visible_mask):
+     # statis grad information to guide liftting. 
+    def training_statis(self, viewspace_point_tensor, opacity, update_filter, offset_selection_mask, anchor_visible_mask, grad_threshold=0.0002):
+        # if xyz_sdf != None:
+        #     def simple_sdf_activate(x, sigma=0.01):
+        #         # return 1/torch.log(x.abs()+1)
+
+        #         return torch.exp(-x**2/sigma)
+            # def sdf_activate(x):
+            #     return torch.clamp(0.05/torch.log(x.abs()+1), max = 0.5) * grad_threshold
+                # return 0.002/(1+torch.exp(x.abs()))
         # update opacity stats
         temp_opacity = opacity.clone().view(-1).detach()
         temp_opacity[temp_opacity<0] = 0
@@ -728,21 +736,30 @@ class GaussianModel:
         combined_mask[anchor_visible_mask] = offset_selection_mask
         temp_mask = combined_mask.clone()
         combined_mask[temp_mask] = update_filter
-        
-        grad_norm = torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
+        # import pdb;pdb.set_trace()
+        # if xyz_sdf is not None:
+        #     # sdf_activated = sdf_activate(xyz_sdf.unsqueeze(dim=-1))
+        #     sdf_activated = simple_sdf_activate(xyz_sdf.unsqueeze(dim=-1))
+        #     # grad = (viewspace_point_tensor.grad + torch.clamp(0.00005*sdf_activated, max = 10*grad_threshold))[update_filter,:2]
+        #     # import pdb;pdb.set_trace()
+        #     grad = (viewspace_point_tensor.grad)[update_filter,:2]
+
+
+        #     # grad = (viewspace_point_tensor.grad + torch.clamp(0.05*sdf_activated, max = 0.5) * grad_threshold)[update_filter,:2]
+        # else:
+        grad = (viewspace_point_tensor.grad)[update_filter,:2]
+        # grad_norm = torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
+        grad_norm = torch.norm(grad, dim=-1, keepdim=True)
         self.offset_gradient_accum[combined_mask] += grad_norm
         self.offset_denom[combined_mask] += 1
-
-        
-
+        # import pdb;pdb.set_trace()
+        # if xyz_sdf is not None:
+        #     self.offset_sdf_accum[combined_mask] += anchor_sdf[update_filter] # .unsqueeze(dim=-1)
         
     def _prune_anchor_optimizer(self, mask):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
-            if  'mlp' in group['name'] or \
-                'conv' in group['name'] or \
-                'feat_base' in group['name'] or \
-                'embedding' in group['name']:
+            if 'mlp' in group['name'] or 'conv' in group['name'] or 'feat_base' in group['name']:
                 continue
 
             stored_state = self.optimizer.state.get(group['params'][0], None)
