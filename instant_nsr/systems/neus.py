@@ -609,7 +609,12 @@ class NeuSSystem(BaseSystem):
                 if self.current_epoch_set < self.config.model.geometry.xyz_encoding_config.start_step:                
                     normal_loss_gs = 0.0
                 else:
-                    normal_loss_gs = self.cos_similarity_loss(picked_normal[out['rays_valid'][...,0]],fixed_neus_picked_normal)* self.config.system.loss.normal_w
+                    surface_mask = alpha > self.op.omit_opacity_threshold # H, W
+                    alpha = render_pkg["alpha"].detach()[0] # H, W
+                    depth = render_pkg["depth"][0] # view space
+                    normal_from_depth = render_normal_from_depth(viewpoint_cam, depth) * alpha
+                    normal_loss_gs = predicted_normal_loss(normal, normal_from_depth, surface_mask, threshold=self.op.omit_opacity_threshold)
+                    #normal_loss_gs = 0.0 self.cos_similarity_loss(picked_normal[out['rays_valid'][...,0]],fixed_neus_picked_normal)* self.config.system.loss.normal_w
 
                 self.log('train/normal_loss_gs', normal_loss_gs)
                 # depth loss of GS side
