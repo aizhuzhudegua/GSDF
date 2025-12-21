@@ -98,16 +98,16 @@ class PipelineParams(ParamGroup):
 
 class OptimizationParams(ParamGroup):
     def __init__(self, parser):
-        self.iterations = 30_000
+        self.iterations = 45000 #30_000
         self.position_lr_init = 0.0
         self.position_lr_final = 0.0
         self.position_lr_delay_mult = 0.01
-        self.position_lr_max_steps = 30_000
+        self.position_lr_max_steps =  self.iterations# 30_000
         
         self.offset_lr_init = 0.01
         self.offset_lr_final = 0.0001
         self.offset_lr_delay_mult = 0.01
-        self.offset_lr_max_steps = 30_000
+        self.offset_lr_max_steps = self.iterations#30_000
 
         self.feature_lr = 0.0075
         self.opacity_lr = 0.02
@@ -118,47 +118,47 @@ class OptimizationParams(ParamGroup):
         self.mlp_opacity_lr_init = 0.002
         self.mlp_opacity_lr_final = 0.00002  
         self.mlp_opacity_lr_delay_mult = 0.01
-        self.mlp_opacity_lr_max_steps = 30_000
+        self.mlp_opacity_lr_max_steps = self.iterations#30_000
 
         self.mlp_cov_lr_init = 0.004
         self.mlp_cov_lr_final = 0.004
         self.mlp_cov_lr_delay_mult = 0.01
-        self.mlp_cov_lr_max_steps = 30_000
+        self.mlp_cov_lr_max_steps = self.iterations#30_000
 
         self.mlp_color_lr_init = 0.008
         self.mlp_color_lr_final = 0.00005
         self.mlp_color_lr_delay_mult = 0.01
-        self.mlp_color_lr_max_steps = 30_000
+        self.mlp_color_lr_max_steps = self.iterations#30_000
         
         self.mlp_featurebank_lr_init = 0.01
         self.mlp_featurebank_lr_final = 0.00001
         self.mlp_featurebank_lr_delay_mult = 0.01
-        self.mlp_featurebank_lr_max_steps = 30_000
+        self.mlp_featurebank_lr_max_steps = self.iterations#30_000
 
         self.appearance_lr_init = 0.05
         self.appearance_lr_final = 0.0005
         self.appearance_lr_delay_mult = 0.01
-        self.appearance_lr_max_steps = 30_000
+        self.appearance_lr_max_steps = self.iterations#30_000
 
         self.mlp_idiv_lr_init = 0.008
         self.mlp_idiv_lr_final = 0.00005
         self.mlp_idiv_lr_delay_mult = 0.01
-        self.mlp_idiv_lr_max_steps = 30_000
+        self.mlp_idiv_lr_max_steps = self.iterations#30_000
 
         self.mlp_tint_lr_init = 0.008
         self.mlp_tint_lr_final = 0.00005
         self.mlp_tint_lr_delay_mult = 0.01
-        self.mlp_tint_lr_max_steps = 30_000
+        self.mlp_tint_lr_max_steps = self.iterations#30_000
 
         self.mlp_roughness_lr_init = 0.002
         self.mlp_roughness_lr_final = 0.00002
         self.mlp_roughness_lr_delay_mult = 0.01
-        self.mlp_roughness_lr_max_steps = 30_000
+        self.mlp_roughness_lr_max_steps = self.iterations#30_000
 
         self.mlp_specular_lr_init = 0.008
         self.mlp_specular_lr_final = 0.00005
         self.mlp_specular_lr_delay_mult = 0.01
-        self.mlp_specular_lr_max_steps = 30_000
+        self.mlp_specular_lr_max_steps = self.iterations#30_000
 
         self.percent_dense = 0.01
         self.lambda_dssim = 0.2
