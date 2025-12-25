@@ -41,6 +41,9 @@ from instant_nsr.systems import register
 from gaussian_splatting.utils.graphics_utils import normalize_rendered_by_weights, render_normal_from_depth
 from gaussian_splatting.utils.loss_utils import predicted_normal_loss, total_variation, cross_entropy_loss
 
+# torch.set_num_threads(32)
+lpips_fn = lpips.LPIPS(net='vgg').to('cuda')
+
 try:
     from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_FOUND = True
@@ -68,7 +71,8 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
             if config['cameras'] and len(config['cameras']) > 0:
                 l1_test = 0.0
                 psnr_test = 0.0
-                
+                ssims_test = 0.0
+                lpips_test = 0.0
                 if wandb is not None:
                     gt_image_list = []
                     render_image_list = []
@@ -105,10 +109,14 @@ def training_report(tb_writer, dataset_name, iteration, Ll1, loss, l1_loss, elap
 
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
+                    ssims_test += ssim(image, gt_image).mean().double()
+                    lpips_test += lpips_fn(image, gt_image).mean().double()
           
                 psnr_test /= len(config['cameras'])
                 l1_test /= len(config['cameras'])          
-                logger.info("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
+                ssims_test /= len(config['cameras'])          
+                lpips_test /= len(config['cameras'])          
+                logger.info("\n[ITER {}] Evaluating {}: L1 {} PSNR {} SSIM {} LPIPS {}".format(iteration, config['name'], l1_test, psnr_test, ssims_test,lpips_test))
                 
                 if tb_writer:
                     tb_writer.add_scalar(f'{dataset_name}/'+config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
