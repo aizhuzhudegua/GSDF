@@ -32,7 +32,8 @@ import torchvision
 # from gaussian_splatting.utils.misc import config_to_primitive
 import random
 from pathlib import Path
-from gaussian_splatting.lpipsPyTorch import lpips
+# from gaussian_splatting.lpipsPyTorch import lpips
+import lpips
 import json
 from os import makedirs
 from PIL import Image
