@@ -60,7 +60,7 @@ class ModelParams(ParamGroup):
         self._images = "images"
         self._resolution = -1
         self._white_background = False
-        self.data_device = "cpu" #cuda
+        self.data_device = "cuda"
         self.eval = False
         self.lod = 0
 
